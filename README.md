@@ -1,6 +1,8 @@
-# workgroups
+# Purpose
 
 The mission of the ELISA project is to define and maintain a common set of elements, processes and tools that can be incorporated into Linux-based, safety-critical systems amenable to safety certification.
+
+# Workgroups
 
 The project is still forming, and the proposed workgroups are
 * Component Quality Assurance Working Group
