@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2019 Bayerische Motoren Werke Aktiengesellschaft (BMW AG)
+#
+# SPDX-License-Identifier: 	Apache-2.0
+
+
+pandas
+pyyaml
+clang
+pyro4
+IPython
+
