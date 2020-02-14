@@ -30,7 +30,16 @@ If you have generated pickle-file, please continue to section about inspecting t
 
 0. ASM GOTO 
 Depending on the choice of clang version used, it might be necessary to disable support for ASM GOTO in the compilation process. If clang version is greater or equal 9, it is safe to
-skip this step. Otherwise, check the section about older Clang versions in the [clang setup](doc/clangsetup.md) file.
+skip this step. Otherwise, check the section about older Clang versions in the [clang setup](doc/clangsetup.md) file. One convenient way to get the latest Clang is to use scripts provided within [ClangBuildLinux](https://github.com/ClangBuiltLinux/tc-build) repository.
+
+### Build Log options
+
+Callgraph tool support various build options which can be selected with --build_log_format option:
+* kernel\_c
+* kernel\_clang
+* ll\_clang
+
+Default option is _kernel\_c_. The instructions in this document assume the default option. For more details about other options see the detailed [documentation](doc/buildlogoptions.md) for build log options.
 
 
 1. Collect verbose build log for Linux kernel like so:
@@ -74,6 +83,10 @@ The output is stored in the file trigger_call_map.pickle (name can be user speci
 
 ### Fast callgraph build
 Callgraph tool supports reusing existing _llvm_ files generated in the previous build using the _--fast_build_ option. This feature is useful during the tool development process.
+
+### Exclude from build
+Specific files and folders can be skipped from build using the --exclude_from_build command line option. The arguments are provided as comma separated list. If any word
+in a list is contained in the path name to a processed file it will be skipped.
 
 ## Inspecting the call graph data
 

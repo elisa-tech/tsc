@@ -65,7 +65,8 @@ def get_unsupported_arguments_x86():
 def get_unsupported_arguments_mips():
     unsupported_arguments = ['-msym32', '-fno-delete-null-pointer-checks', '-fmerge-constants',
                              '--param=allow-store-data-races=0', '-Wno-frame-address', '-Wno-format-truncation',
-                             '-Wno-format-overflow', '-Wno-unused-but-set-variable', '-Werror=designated-init']
+                             '-Wno-format-overflow', '-Wno-unused-but-set-variable', '-Werror=designated-init',
+                             '-femit-struct-debug-baseonly', '-Wimplicit-fallthrough']
     return unsupported_arguments
 
 
@@ -119,7 +120,7 @@ class ClangCommand(object):
 
     def __call__(self):
         if os.system(self.command) != 0:
-            logging.error("Encountered error running clang, aborting")
+            logging.error("Encountered error running clang on %s, aborting", self.translation_unit())
             return False
         return True
 
@@ -174,6 +175,17 @@ class ClangKernel(ClangCommand):
             self.filename = m.group('filename')
             return True
         return False
+
+    def _convert(self):
+        self._turn_of_optimizations()
+        self.valid = self._extract_params()
+        if self.valid:
+            if self.arch == 'x86':
+                self.command = "%s %s -g -fno-builtin -nobuiltininc -S -emit-llvm %s -o %s%s" % (
+                    self.clang_path, self.cc_args, self.filename, self.filename, DEF_LLVM_EXT)
+            elif self.arch == 'mips':
+                self.command = "%s %s -g -fno-builtin -S -emit-llvm %s -o %s%s" % (
+                    self.clang_path, self.cc_args, self.filename, self.filename, DEF_LLVM_EXT)
 
     def exclude_from_build(self, ex_iterable):
         return any(exclude in self.output for exclude in ex_iterable)
