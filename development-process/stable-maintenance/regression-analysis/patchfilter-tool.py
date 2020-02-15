@@ -20,11 +20,11 @@ def parse_objdump(infile, outfile, linux_dir):
 
     for line in infile:
         emptyline = False
-        if ' The Directory Table' in line:
+        if ' The Directory Table (' in line:
             s_dirtable = True
             dirtable = []
             skiplines = 1
-        elif ' The File Name Table' in line:
+        elif ' The File Name Table (' in line:
             s_filenametable = True
             skiplines = 2
         elif line.strip() == '':
@@ -64,6 +64,8 @@ def parse_objdump(infile, outfile, linux_dir):
     for item in sorted(fileset):
         outfile.write("%s\n" % item)
 
+    return bool(fileset)
+
 
 def exec_cmd(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE):
     pipe = subprocess.Popen(
@@ -79,16 +81,33 @@ def exec_cmd(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE):
 def getargs():
     desc =\
         "Script calls objdump for vmlinux and all modules (*.ko) "\
-        "found under LINUX_DIR, parses the output, and produces a list of "\
+        "found under the LINUX_DIR, parses the DWARF debug sections from the "\
+        "object files, and produces a list of "\
         "patches in range REV that modified the kernel source files relevant "\
         "for the specific kernel build. "\
         "The script can be used to reduce the patches in the range REV to "\
         "those that are relevant for the kernel configuration that was used "\
-        "in building the vmlinux and the modules."
+        "in building the vmlinux and the modules. "\
+        "Note: the script produces a list of files that were used to "\
+        "compile the _current_ version of vmlinux and modules found under "\
+        "the LINUX_DIR. "\
+        "Strictly speaking, the produced filelist "\
+        "is correct only for the specific version of the kernel source "\
+        "tree that was used in building the image. "\
+        "Since the source tree might have been refactored between the "\
+        "commits, the filelist might not be correct for newer or "\
+        "older versions of the kernel tree. "\
+        "The longer the distance between the built version of image found "\
+        "under the LINUX_DIR and the commits in the specified revision "\
+        "range, "\
+        "the more likely it is that the produced list of patches "\
+        "includes some incorrect commits or misses some commits."
 
-    epil = "Example: ./%s --linux-dir ~/linux-stable v4.19..v4.19.80" % \
+    epil = "Example: ./%s --linux-dir ~/linux-stable v4.19.96..v4.19.97" % \
         os.path.basename(__file__)
-    parser = argparse.ArgumentParser(description=desc, epilog=epil)
+    parser = argparse.ArgumentParser(
+        description=desc,
+        epilog=epil)
 
     help = "revision specifier, see git-rev-parse for viable options. "
     parser.add_argument('REV', nargs=1, help=help)
@@ -143,8 +162,15 @@ if __name__ == '__main__':
 
     # Parse objdump
     with open(objdumpfile, 'r') as infile, open(filelistfile, 'w') as outfile:
-        parse_objdump(infile, outfile, linux_dir)
-    print("[+] Wrote: %s" % filelistfile)
+        print("[+] Wrote: %s" % filelistfile)
+        if not parse_objdump(infile, outfile, linux_dir):
+            sys.stderr.write(
+                "Error: parsing objdump failed\n"
+                "This script expects DWARF debug sections in the object files.\n"
+                "Hint: try compiling the kernel with CONFIG_DEBUG_INFO=y, "
+                "then re-run the script.\n"
+            )
+            sys.exit(1)
 
     # Generate patchlist
     with open(filelistfile, 'r') as infile, open(patchlistfile, 'w') as outfile:

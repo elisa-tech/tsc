@@ -164,11 +164,28 @@ class GitStatistics:
             badfix_upstream_lifetime_days = \
                 int(round(badfix_upstream_timedelta / timedelta(days=1)))
 
+        if not commit_upstream_commit:
+            commit_upstream_committed = ""
+            commit_latency_us_days_decimal = ""
+            commit_latency_us_days = ""
+        else:
+            commit_upstream_committed = \
+                commit_upstream_commit.committed_datetime
+            commit_latency_us_timedelta = \
+                commit.committed_datetime - commit_upstream_commit.committed_datetime
+            commit_latency_us_days_decimal = \
+                commit_latency_us_timedelta / timedelta(days=1)
+            commit_latency_us_days = \
+                int(round(commit_latency_us_timedelta / timedelta(days=1)))
+
         inscope = "1"
         if self.inscopeset:
             inscope = "1" if commit.hexsha[:12] in self.inscopeset else "0"
         commit_tag = self.tagmap.get(commit.hexsha, ["unknown"])[0]
         commit_signer = ";".join(self.signedoffmap.get(commit.hexsha, [""]))
+        # Be aware that this is a rough estimation: not all commits
+        # signed-off-by Sasha Levin are AUTOSEL patches
+        commit_autosel = 1 if "Sasha Levin" in commit_signer else 0
 
         setcol = self.entries.setdefault
         setcol('Commit_hexsha', []).append(commit.hexsha)
@@ -176,15 +193,24 @@ class GitStatistics:
         setcol('Commit_datetime', []).append(commit.committed_datetime)
         setcol('Commit_tag', []).append(commit_tag)
         setcol('Commit_signedby', []).append(commit_signer)
+        setcol('Commit_latency_upstream_stable_days', []).append(
+            commit_latency_us_days)
+        setcol('Commit_latency_upstream_stable_days_decimal', []).append(
+            commit_latency_us_days_decimal)
         setcol('Commit_upstream_hexsha', []).append(commit_upstream_hexsha)
+        setcol('Commit_upstream_committed', []).append(
+            commit_upstream_committed)
+        setcol('Commit_autosel', []).append(commit_autosel)
         setcol('Badfix_hexsha', []).append(badfix_sha)
         setcol('Badfix_datetime', []).append(badfix_datetime)
         setcol('Badfix_upstream_hexsha', []).append(badfix_upstream_hexsha)
         setcol('Badfix_lifetime_days', []).append(badfix_lifetime_days)
-        setcol('Badfix_lifetime_days_decimal', []).append(badfix_lifetime_days_decimal)
+        setcol('Badfix_lifetime_days_decimal', []).append(
+            badfix_lifetime_days_decimal)
         setcol('Badfix_tag', []).append(badfix_tag)
         setcol('Badfix_signedby', []).append(badfix_signer)
-        setcol('Badfix_upstream_lifetime_days', []).append(badfix_upstream_lifetime_days)
+        setcol('Badfix_upstream_lifetime_days', []).append(
+            badfix_upstream_lifetime_days)
         setcol('Badfix_upstream_lifetime_days_decimal', []).append(
             badfix_upstream_lifetime_days_decimal)
         setcol('Found_by', []).append(found_by)
@@ -193,9 +219,9 @@ class GitStatistics:
 
     def _check_line_badfix_sha(self, line):
         RE_REVERT_SHA = re.compile(
-            r'.*[Rr]evert.*commit.*\s+(?P<sha>[0-9a-f]{5,40})\b')
+            r'.*[Rr]evert.{0,10}commit.*\s+(?P<sha>[0-9a-f]{5,40})\b')
         RE_FIXES_SHA = re.compile(
-            r'.*[Ff]ixes.*\s+(?P<sha>[0-9a-f]{5,40})\b')
+            r'.*[Ff]ixes.{0,10}\s+(?P<sha>[0-9a-f]{5,40})\b')
         badfixsha = ""
         match = ""
         matched_by = ""
@@ -234,11 +260,11 @@ class GitStatistics:
         RE_REVERT_SUMMARY = re.compile(
             r'^\s*[Rr]evert\s*[\"\'(](?P<summary>.+)[\"\')]$')
         RE_FIXES_SUMMARY_1 = re.compile(
-            r'^\s*[Ff]ixes.*\s*[0-9a-f]{5,40}:?\s*\(?["\'](?P<summary>.*)["\']\)?')
+            r'^\s*[Ff]ixes.{0,10}\s*[0-9a-f]{5,40}:?\s*\(?["\'](?P<summary>.*)["\']\)?')
         RE_FIXES_SUMMARY_2 = re.compile(
-            r'^\s*[Ff]ixes.*\s*[0-9a-f]{5,40}:?\s*\((?P<summary>.*)\)')
+            r'^\s*[Ff]ixes.{0,10}\s*[0-9a-f]{5,40}:?\s*\((?P<summary>.*)\)')
         RE_FIXES_SUMMARY_3 = re.compile(
-            r'^\s*[Ff]ixes.*\s*[0-9a-f]{5,40}:?\s+(?P<summary>[^\(\"]+)$')
+            r'^\s*[Ff]ixes.{0,10}\s*[0-9a-f]{5,40}:?\s+(?P<summary>[^\(\"]+)$')
         badfix = ""
         match = ""
         matched_by = ""
@@ -299,33 +325,46 @@ class GitStatistics:
 
     def _build_upstreamindexes(self):
         RE_UPSTREAM_1 = re.compile(
-            r'^\s*\[?\s*[Cc]omm?[it]{2}\s*(?P<sha>[0-9a-f]{10,40})\s+[Uu]pst?ream\.?\s*\]?\s*$')
+            # Negative lookbehind:
+            # Match (1) that is not preceded by (2), (3), (4), or (5)
+            # We need this because below is a valid upstream reference:
+            #     commit HEXSHA1 upstream.
+            # Whereas, this is not a valid upstream reference:
+            #     This reverts commit HEXSHA2 which is
+            #     commit HEXSHA1 upstream.
+            r'(?<!reverts commit [0-9a-f]{40} which is)'    # (2)
+            r'(?<!reverts commit [0-9a-f]{40}, which is)'   # (3)
+            r'(?<!reverts commit [0-9a-f]{40} which was)'   # (4)
+            r'(?<!reverts commit [0-9a-f]{40}, which was)'  # (5)
+            r'$'
+            r'\s*\[?\s*[Cc]omm?[it]{2}\s*(?P<sha>[0-9a-f]{10,40})\s+[Uu]pst?ream\.?\s*\]?\s*$',  # (1)
+            re.MULTILINE)
         RE_UPSTREAM_2 = re.compile(
-            r'^\s*\[?\s*[Cc]omm?[it]{2}\s*(?P<sha>[0-9a-f]{40})\.?\s*\]?\s*$')
-        RE_UPSTREAM_3 = re.compile(
-            r'^\s*\[?\s*[Uu]pst?ream\s+[Cc]omm?[it]{2}\s*(?P<sha>[0-9a-f]{40})')
+            r'(?<!reverts commit [0-9a-f]{40} which is)'    # (2)
+            r'(?<!reverts commit [0-9a-f]{40}, which is)'   # (3)
+            r'(?<!reverts commit [0-9a-f]{40} which was)'   # (4)
+            r'(?<!reverts commit [0-9a-f]{40}, which was)'  # (5)
+            r'$'
+            r'^\s*\[?\s*[Uu]pst?ream\s+[Cc]omm?[it]{2}\s*(?P<sha>[0-9a-f]{40})',  # (1)
+            re.MULTILINE)
         for commit in list(self.repo.iter_commits(self.rev)):
-            for line in commit.message.splitlines():
-                match = ""
-                if not match:
-                    match = RE_UPSTREAM_1.match(line)
-                if not match:
-                    match = RE_UPSTREAM_2.match(line)
-                if not match:
-                    match = RE_UPSTREAM_3.match(line)
-                if match:
-                    upstreamsha = match.group('sha')
-                    upstreamsha = self._get_long_commit_sha(upstreamsha)
-                    if not upstreamsha:
-                        # _get_long_commit_sha() returns None if
-                        # upstreamsha is not in the git tree. We'll ignore
-                        # such upstream references.
-                        break
-                    sha = commit.hexsha
-                    self.mapupstreamtocommit.setdefault(
-                        upstreamsha, []).append(sha)
-                    self.mapcommittoupstream[sha] = upstreamsha
-                    break
+            match = ""
+            if not match:
+                match = RE_UPSTREAM_1.search(commit.message)
+            if not match:
+                match = RE_UPSTREAM_2.search(commit.message)
+            if match:
+                upstreamsha = match.group('sha')
+                upstreamsha = self._get_long_commit_sha(upstreamsha)
+                if not upstreamsha:
+                    # _get_long_commit_sha() returns None if
+                    # upstreamsha is not in the git tree. We'll ignore
+                    # such upstream references.
+                    continue
+                sha = commit.hexsha
+                self.mapupstreamtocommit.setdefault(
+                    upstreamsha, []).append(sha)
+                self.mapcommittoupstream[sha] = upstreamsha
 
     def _build_inscopeset(self, inscopefile):
         if not inscopefile:

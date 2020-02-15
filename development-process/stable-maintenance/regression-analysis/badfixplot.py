@@ -11,6 +11,8 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objs as go
 import plotly.offline as py
+from lifelines import KaplanMeierFitter
+from dateutil.relativedelta import relativedelta
 
 ################################################################################
 
@@ -43,7 +45,7 @@ class Plotter:
         # Calculate the "window size" or the min number of commits required
         # when calculating the sliding window regression ratio.
         commits = self.df_csv.shape[0]
-        window_size_releases = 10 if len(tags) < 400 else 15
+        window_size_releases = 10
         self.window_size = int((commits / len(tags)) * window_size_releases)
 
     def plot_regression_events(self, outprefix):
@@ -190,7 +192,7 @@ class Plotter:
             mode='markers',
             name="Regression",
             marker=dict(
-                color='rgba(255, 0, 0, 0.4)',
+                color='rgba(255, 0, 0, 0.3)',
                 size=8,
                 line=dict(width=1, color='Gray')),
         )
@@ -376,7 +378,7 @@ class Plotter:
             mode='markers',
             name="Regression",
             marker=dict(
-                color='rgba(0, 255, 0, 0.4)',
+                color='rgba(0, 255, 0, 0.3)',
                 size=8,
                 line=dict(width=1, color='Gray')),
         )
@@ -561,15 +563,9 @@ class Plotter:
             previous_date = release_date
 
         i = 0
-        previous_beg = None
-        previous_end = None
         previous_date = None
         ratio_badfix_fix_cumulative_list = []
         ratio_cumulative_list = []
-        ratio_badfix_fix_dashed_beg_list = []
-        ratio_cumulative_dashed_beg_list = []
-        ratio_badfix_fix_dashed_end_list = []
-        ratio_cumulative_dashed_end_list = []
         hover_cumulative_list = []
         hover_badfix_fix_list = []
         for tag in self.release_tags:
@@ -581,41 +577,14 @@ class Plotter:
             ratio_avg_cumulative = n_cum_badfixes / n_cum_commits
             ratio_avg_badfix_fix_cumulative = n_cum_badfix_fixes / n_cum_commits
 
-            dashed_beg = (previous_beg is None or (beg == 0 and previous_beg == 0))
-            dashed_end = (end == len(n_commits_list) and end == previous_end)
-
             if previous_date is not None and release_date == previous_date:
                 duplicate_date = True
                 ratio_cumulative_list[-1] = ratio_avg_cumulative
                 ratio_badfix_fix_cumulative_list[-1] = ratio_avg_badfix_fix_cumulative
-                if dashed_beg:
-                    if ratio_cumulative_dashed_beg_list:
-                        ratio_cumulative_dashed_beg_list[-1] = ratio_avg_cumulative
-                    else:
-                        ratio_cumulative_dashed_beg_list.append(ratio_avg_cumulative)
-                    if ratio_badfix_fix_dashed_beg_list:
-                        ratio_badfix_fix_dashed_beg_list[-1] = ratio_avg_badfix_fix_cumulative
-                    else:
-                        ratio_badfix_fix_dashed_beg_list.append(ratio_avg_badfix_fix_cumulative)
-                elif dashed_end:
-                    if ratio_cumulative_dashed_end_list:
-                        ratio_cumulative_dashed_end_list[-1] = ratio_avg_cumulative
-                    else:
-                        ratio_cumulative_dashed_end_list.append(ratio_avg_cumulative)
-                    if ratio_badfix_fix_dashed_end_list:
-                        ratio_badfix_fix_dashed_end_list[-1] = ratio_avg_badfix_fix_cumulative
-                    else:
-                        ratio_badfix_fix_dashed_end_list.append(ratio_avg_badfix_fix_cumulative)
             else:
                 duplicate_date = False
                 ratio_cumulative_list.append(ratio_avg_cumulative)
                 ratio_badfix_fix_cumulative_list.append(ratio_avg_badfix_fix_cumulative)
-                if dashed_beg:
-                    ratio_cumulative_dashed_beg_list.append(ratio_avg_cumulative)
-                    ratio_badfix_fix_dashed_beg_list.append(ratio_avg_badfix_fix_cumulative)
-                elif dashed_end:
-                    ratio_cumulative_dashed_end_list.append(ratio_avg_cumulative)
-                    ratio_badfix_fix_dashed_end_list.append(ratio_avg_badfix_fix_cumulative)
 
             window_left_edge = self.mapreltodate.get(tag_list[beg])
             window_right_edge = self.mapreltodate.get(tag_list[int(end) - 1])
@@ -655,8 +624,6 @@ class Plotter:
                 hover_badfix_fix_list.append(hovertext_fix)
 
             previous_date = release_date
-            previous_beg = beg
-            previous_end = end
             i += 1
 
         # Regression ratio average over all releases
@@ -687,34 +654,16 @@ class Plotter:
         )
         data.append(scatter)
 
-        # Regression ratio cumulative sliding window: dotted beginning
-        beg = 0
-        end = len(ratio_cumulative_dashed_beg_list)
         uniq_dates_list = pd.Series(self.release_dates).drop_duplicates().tolist()
-        scatter = go.Scatter(
-            x=uniq_dates_list[beg:end],
-            y=ratio_cumulative_dashed_beg_list,
-            hovertext=hover_cumulative_list[beg:end],
-            hoverinfo="text",
-            legendgroup='Cumulative ratio',
-            line=dict(dash='dot', color='rgba(26,122,217,0.8)', width=2.5),
-            mode='lines',
-            xaxis="x1",
-            yaxis="y1",
-            showlegend=False,
-        )
-        data.append(scatter)
 
-        # Regression ratio cumulative sliding window: middle
-        beg = len(ratio_cumulative_dashed_beg_list) - 1
-        end = len(ratio_cumulative_list) - len(ratio_cumulative_dashed_end_list) + 1
+        # Regression ratio cumulative sliding window
         scatter = go.Scatter(
-            x=uniq_dates_list[beg:end],
-            y=ratio_cumulative_list[beg:end],
-            hovertext=hover_cumulative_list[beg:end],
+            x=uniq_dates_list,
+            y=ratio_cumulative_list,
+            hovertext=hover_cumulative_list,
             hoverinfo="text",
             legendgroup='Cumulative ratio',
-            line=dict(color='rgba(26,122,217,0.8)', width=2.5),
+            line=dict(color='rgba(255,0,0,0.5)', width=2),
             name=r'Regression ratio <br \>(sliding window)',
             mode='lines',
             xaxis="x1",
@@ -722,71 +671,18 @@ class Plotter:
         )
         data.append(scatter)
 
-        # Regression ratio cumulative sliding window: dotted end
-        beg = len(ratio_cumulative_list) - len(ratio_cumulative_dashed_end_list)
-        end = beg + len(ratio_cumulative_dashed_end_list)
+        # Regression fix ratio cumulative sliding window
         scatter = go.Scatter(
-            x=uniq_dates_list[beg:end],
-            y=ratio_cumulative_dashed_end_list,
-            hovertext=hover_cumulative_list[beg:end],
-            hoverinfo="text",
-            legendgroup='Cumulative ratio',
-            line=dict(dash='dot', color='rgba(26,122,217,0.8)', width=2.5),
-            mode='lines',
-            xaxis="x1",
-            yaxis="y1",
-            showlegend=False,
-        )
-        data.append(scatter)
-
-        # Regression fix ratio cumulative sliding window: dotted beginning
-        beg = 0
-        end = len(ratio_badfix_fix_dashed_beg_list)
-        scatter = go.Scatter(
-            x=uniq_dates_list[beg:end],
-            y=ratio_badfix_fix_dashed_beg_list,
-            hovertext=hover_badfix_fix_list[beg:end],
+            x=uniq_dates_list,
+            y=ratio_badfix_fix_cumulative_list,
+            hovertext=hover_badfix_fix_list,
             hoverinfo="text",
             legendgroup='Badfix fix ratio',
-            line=dict(dash='dot', color='lightgreen', width=2.5),
-            mode='lines',
-            xaxis="x1",
-            yaxis="y1",
-            showlegend=False,
-        )
-        data.append(scatter)
-
-        # Regression fix ratio cumulative sliding window: middle
-        beg = len(ratio_badfix_fix_dashed_beg_list) - 1
-        end = len(ratio_badfix_fix_cumulative_list) - len(ratio_badfix_fix_dashed_end_list) + 1
-        scatter = go.Scatter(
-            x=uniq_dates_list[beg:end],
-            y=ratio_badfix_fix_cumulative_list[beg:end],
-            hovertext=hover_badfix_fix_list[beg:end],
-            hoverinfo="text",
-            legendgroup='Badfix fix ratio',
-            line=dict(width=2.5, color='lightgreen'),
+            line=dict(color='lightgreen', width=2.5),
             name=r'Regression fix ratio <br \>(sliding window)',
             mode='lines',
             xaxis="x1",
             yaxis="y1",
-        )
-        data.append(scatter)
-
-        # Regression fix ratio cumulative sliding window: dotted end
-        beg = len(ratio_badfix_fix_cumulative_list) - len(ratio_badfix_fix_dashed_end_list)
-        end = beg + len(ratio_badfix_fix_dashed_end_list)
-        scatter = go.Scatter(
-            x=uniq_dates_list[beg:end],
-            y=ratio_badfix_fix_dashed_end_list,
-            hovertext=hover_badfix_fix_list[beg:end],
-            hoverinfo="text",
-            legendgroup='Badfix fix ratio',
-            line=dict(dash='dot', color='lightgreen', width=2.5),
-            mode='lines',
-            xaxis="x1",
-            yaxis="y1",
-            showlegend=False,
         )
         data.append(scatter)
 
@@ -829,7 +725,11 @@ class Plotter:
 
     def plot_notfound_ratio(self, outprefix):
         df_badfixes = self.df_csv[self.df_csv['Badfix_hexsha'].notnull()]
+        df_badfixes_copy = df_badfixes.copy()
         df_lifetimes = df_badfixes['Badfix_lifetime_days']
+
+        no_regressions = False
+
         # Index: lifetime, Value: count of observations (sorted by index)
         lifetime_counts = df_lifetimes.value_counts().sort_index()
         lifetime_list = [0]
@@ -845,45 +745,68 @@ class Plotter:
             lifetime_list.append(lifetime)
             lifetime_count_list.append(lifetime_count)
 
-        i = 0
-        hovertexts_1 = []
-        hovertexts_2 = []
-        hoverinfos = []
-        ratio_not_found_badfixes_list = []
-        halflife = None
-        halfratio = 0
-        for cumsum in cumsum_found_badfixes_list:
-            notfound = counts_sum - cumsum
-            if counts_sum == 0:
-                ratio_not_found = 0
-            else:
-                ratio_not_found = notfound / counts_sum
-            ratio_not_found_badfixes_list.append(ratio_not_found)
-            hoverinfos.append("x+text")
-            pct = '{:.0%}'.format(ratio_not_found)
-            lifetime = int(lifetime_list[i])
-            if ratio_not_found <= 0.5 and halflife is None:
-                halflife = lifetime
-                halfratio = ratio_not_found
+        df_badfixes_copy.loc[:, ('Badfix_lifetime_days')] = \
+            pd.to_numeric(df_badfixes_copy.loc[:, ('Badfix_lifetime_days')], errors='coerce')
+        df_badfixes_copy = df_badfixes_copy[~(df_badfixes_copy['Badfix_lifetime_days'] <= 0)]
+        durations = df_badfixes_copy['Badfix_lifetime_days']
+        # Event is observed for each regression
+        event_observed = [1 for x in range(df_badfixes_copy.shape[0])]
+
+        try:
+            kmf = KaplanMeierFitter()
+            kmf.fit(durations, event_observed)
+
+            df_kmf_survival_function = kmf.survival_function_
+            ratio_not_found_badfixes_list = list(df_kmf_survival_function['KM_estimate'])
+            survival_list = list(df_kmf_survival_function['KM_estimate'].index)
+
+            # Compute confidence intervals
+            kcd = kmf.confidence_interval_
+            df_kcd = kcd[kcd['KM_estimate_upper_0.95'].notnull() & kcd['KM_estimate_upper_0.95'].notnull()]
+            km_estimate_upper_95 = list(df_kcd['KM_estimate_upper_0.95'])
+            km_estimate_lower_95 = list(df_kcd['KM_estimate_lower_0.95'])
+
+            # Halflife
+            halflife = int(kmf.median_survival_time_)
+            halfindex = survival_list.index(halflife)
+            halfratio = ratio_not_found_badfixes_list[halfindex]
+
             hovertext_1 = \
-                r'Not found regression: %s<br \>'\
-                r'Lifetime: %s days<br \><br \>'\
-                r'(On average after %s days, %s of<br \>'\
-                r'regressions have not been found)'\
-                % \
-                (pct, lifetime, lifetime, pct)
-            hovertexts_1.append(hovertext_1)
+                r'Not found regressions: {}%<br \>' \
+                r'Probability of regressions not found: {}<br \>' \
+                r'Lifetime: {} days<br \><br \>' \
+                r'(On average after {} days, {}% of<br \>' \
+                r'regressions have not been found)'
+
             hovertext_2 = \
-                r'Lifetime: %s days<br \>'\
-                r'Number of regressions: %s'\
-                % \
-                (int(lifetime_list[i]), lifetime_count_list[i])
-            hovertexts_2.append(hovertext_2)
-            i += 1
+                r'Lifetime: {} days<br \>' \
+                r'Number of regressions: {}'
+
+            hoverinfos = ["x+text" for i in survival_list]
+
+            hovertexts_1 = [hovertext_1.format(int(round(ratio_not_found_badfixes_list[i], 2) * 100),
+                                               round(ratio_not_found_badfixes_list[i], 4),
+                                               int(survival_list[i]),
+                                               int(survival_list[i]),
+                                               int(round(ratio_not_found_badfixes_list[i], 2) * 100)) for i in
+                            range(len(survival_list))]
+
+            hovertexts_2 = [hovertext_2.format(lifetime_list[i],
+                                               lifetime_count_list[i]) for i in range(len(lifetime_list))]
+        except ValueError:
+            survival_list = []
+            ratio_not_found_badfixes_list = []
+            hoverinfos = []
+            hovertexts_1 = []
+            hovertexts_2 = []
+            km_estimate_upper_95 = []
+            km_estimate_lower_95 = []
+            no_regressions = True
 
         data = []
+        annotations = []
         scatter = go.Scatter(
-            x=lifetime_list,
+            x=survival_list,
             y=ratio_not_found_badfixes_list,
             hoverinfo=hoverinfos,
             hovertext=hovertexts_1,
@@ -893,6 +816,29 @@ class Plotter:
             yaxis="y1",
         )
         data.append(scatter)
+
+        scatter_ci_up_95 = go.Scatter(
+            x=survival_list,
+            y=km_estimate_upper_95,
+            name='95% Confidence interval upper',
+            fill=None,
+            line=dict(color='rgb(118,169,219)'),
+            xaxis="x1",
+            yaxis="y1",
+        )
+        data.append(scatter_ci_up_95)
+
+        scatter_ci_low_95 = go.Scatter(
+            x=survival_list,
+            y=km_estimate_lower_95,
+            name='95% Confidence interval lower',
+            fill='tonexty',
+            fillcolor='rgba(26,122,217,0.1)',
+            line=dict(color='rgb(118,169,219)'),
+            xaxis="x1",
+            yaxis="y1"
+        )
+        data.append(scatter_ci_low_95)
 
         bar = go.Bar(
             x=lifetime_list,
@@ -906,35 +852,35 @@ class Plotter:
         )
         data.append(bar)
 
-        trace = {
-            'x': [halflife, halflife],
-            'y': [0, halfratio],
-            'mode': 'lines+markers',
-            'name': 'Half-life: %s days' % halflife,
-            'hoverinfo': "x+text",
-            'yaxis': 'y',
-            'line': {'color': 'gray', 'width': 2, 'dash': 'dot'},
-            'marker': {'color': 'gray', 'size': 6},
-            'showlegend': False,
-        }
-        data.append(trace)
+        if not no_regressions:
+            trace = {
+                'x': [halflife, halflife],
+                'y': [0, halfratio],
+                'mode': 'lines+markers',
+                'name': 'Half-life: %s days' % halflife,
+                'hoverinfo': "x+text",
+                'yaxis': 'y',
+                'line': {'color': 'gray', 'width': 2, 'dash': 'dot'},
+                'marker': {'color': 'gray', 'size': 6},
+                'showlegend': False,
+            }
+            data.append(trace)
 
-        annotations = []
-        annotation = {
-            'x': halflife,
-            'y': halfratio,
-            'xref': 'x',
-            'yref': 'y',
-            'text': "Half-life: %s days" % halflife,
-            'showarrow': True,
-            'arrowhead': 1,
-            'arrowsize': 0.5,
-            'arrowwidth': 1,
-            'arrowcolor': 'lightgray',
-            'ax': 30,
-            'ay': -50,
-        }
-        annotations.append(annotation)
+            annotation = {
+                'x': halflife,
+                'y': halfratio,
+                'xref': 'x',
+                'yref': 'y',
+                'text': "Half-life: %s days" % halflife,
+                'showarrow': True,
+                'arrowhead': 1,
+                'arrowsize': 0.5,
+                'arrowwidth': 1,
+                'arrowcolor': 'lightgray',
+                'ax': 30,
+                'ay': -50,
+            }
+            annotations.append(annotation)
 
         layout = {
             "title": {
@@ -974,7 +920,7 @@ class Plotter:
         htmlfilename = outprefix + '__badfixnotfound.html'
         return self._plot_figure(htmlfilename, data, layout)
 
-    def plot_lifetime_stable_vs_mainline(self, outprefix):
+    def plot_lifetime_stable_vs_upstream(self, outprefix):
         # Select only the regressions
         df_badfixes = self.df_csv[self.df_csv['Badfix_hexsha'].notnull()]
         # Drop rows missing 'Badfix_upstream_lifetime_days'
@@ -991,8 +937,8 @@ class Plotter:
                 r'Fix in stable release: %s<br>'\
                 r'Fix commit in stable: %s<br>'\
                 r'Lifetime in stable: %s<br>'\
-                r'Fix commit in mainline: %s<br>'\
-                r'Lifetime in mainline: %s<br>'\
+                r'Fix commit in upstream: %s<br>'\
+                r'Lifetime in upstream: %s<br>'\
                 %\
                 (
                     row['Commit_tag'],
@@ -1026,8 +972,8 @@ class Plotter:
                 r'Fix in stable release: %s<br>'\
                 r'Fix commit in stable: %s<br>'\
                 r'Lifetime in stable: %s<br>'\
-                r'Fix commit in mainline: %s<br>'\
-                r'Lifetime in mainline: %s<br>'\
+                r'Fix commit in upstream: %s<br>'\
+                r'Lifetime in upstream: %s<br>'\
                 %\
                 (
                     row['Commit_tag'],
@@ -1056,10 +1002,10 @@ class Plotter:
 
         layout = {
             "title": {
-                "text": "<b>Regression lifetime stable vs mainline</b>",
+                "text": "<b>Regression Lifetime in Stable vs Upstream</b>",
             },
             "xaxis1": {
-                "title": "Regerssion Lifetime in Mainline (Days)",
+                "title": "Regerssion Lifetime in Upstream (Days)",
                 "showgrid": True,
             },
             "yaxis1": {
@@ -1069,7 +1015,444 @@ class Plotter:
             "template": "plotly_white",
         }
 
-        htmlfilename = outprefix + '__badfixlifetime_stable_vs_mainline.html'
+        htmlfilename = outprefix + '__badfixlifetime_stable_vs_upstream.html'
+        return self._plot_figure(htmlfilename, data, layout)
+
+    def plot_latency_distribution_all_commits(self, outprefix):
+        # Select all patches with latency information
+        df_latency = self.df_csv[
+            self.df_csv['Commit_latency_upstream_stable_days'].notnull()]
+        # We need to drop duplicate commit_hexsha values, since we are plotting
+        # all commits (commit_hexsha) not regressions (pair of
+        # [commit_hesha,badfix_hexsha])
+        df_latency = df_latency.drop_duplicates(subset=['Commit_hexsha'])
+        # Select autosel patches with latency information
+        df_autosel = df_latency[df_latency['Commit_autosel'] == 1]
+        # Select non-autosel patches with latency information
+        df_nonautosel = df_latency[df_latency['Commit_autosel'] == 0]
+
+        data = []
+
+        # Group autosel patches
+        df_group_autosel = df_autosel.groupby(['Commit_latency_upstream_stable_days'])\
+            .size()\
+            .reset_index()\
+            .rename(columns={0: 'count'})
+
+        # Group autosel patches
+        df_group_nonautosel = df_nonautosel.groupby(['Commit_latency_upstream_stable_days'])\
+            .size()\
+            .reset_index()\
+            .rename(columns={0: 'count'})
+
+        # Latency distribution: autosel commits
+        scatter = go.Scatter(
+            x=df_group_autosel['Commit_latency_upstream_stable_days'],
+            y=df_group_autosel['count'],
+            hovertemplate='<b>Autosel commits</b><br>'
+            'Latency: %{x} days<br>'
+            'Number of commits: %{y}<br>'
+            '<extra></extra>',
+            name='Autosel commits',
+        )
+        data.append(scatter)
+
+        # Latency distribution: non-autosel commits
+        scatter = go.Scatter(
+            x=df_group_nonautosel['Commit_latency_upstream_stable_days'],
+            y=df_group_nonautosel['count'],
+            hovertemplate='<b>Non-Autosel commits</b><br>'
+            'Latency: %{x} days<br>'
+            'Number of commits: %{y}<br>'
+            '<extra></extra>',
+            name='Non-Autosel commits',
+        )
+        data.append(scatter)
+
+        layout = {
+            "title": {
+                "text": "<b>Latency Distribution: All Commits</b>",
+            },
+            "xaxis1": {
+                "title": "Latency, Upstream --> Stable (Days)",
+                "showgrid": True,
+            },
+            "yaxis1": {
+                "title": "Number of commits",
+                "showgrid": True,
+            },
+            "template": "plotly_white",
+        }
+
+        htmlfilename = outprefix + '__latency_all.html'
+        return self._plot_figure(htmlfilename, data, layout)
+
+    def plot_latency_distribution_regression_commits(self, outprefix):
+        # Select all patches with latency information
+        df_latency = self.df_csv[self.df_csv['Commit_latency_upstream_stable_days'].notnull()]
+        # Select regression patches with latency information
+        df_badfix_fixes = df_latency[df_latency['Badfix_hexsha'].notnull()]
+
+        # To get the latency for the regression commits, we need to:
+        # (1) Find the regressions (Badfix_hexsha)
+        # (2) Select from df_latency the commits where Badfix_hexsa == Commit_hexsha
+        #     to get to the relevant Commit_latency information
+
+        # (1)
+        df_badfixes = df_latency[['Badfix_hexsha']].drop_duplicates()
+        df_badfixes = df_badfixes[df_badfixes['Badfix_hexsha'].notnull()]
+
+        data = []
+
+        if not df_badfixes.empty:
+            # (2)
+            # After this merge, columns in the merged dataframe that have the
+            # "Commit_"-prefix refer the regression
+            df_badfixes = df_badfixes.merge(
+                df_latency,
+                how='inner',
+                left_on=['Badfix_hexsha'],
+                right_on=['Commit_hexsha'],
+                suffixes=('_left', '_right')
+            )
+
+            # Group regression fixes
+            df_group_badfix_fixes = df_badfix_fixes.groupby(['Commit_latency_upstream_stable_days'])\
+                .size()\
+                .reset_index()\
+                .rename(columns={0: 'count'})
+
+            # Group regressions
+            df_group_badfixes = df_badfixes.groupby(['Commit_latency_upstream_stable_days'])\
+                .size()\
+                .reset_index()\
+                .rename(columns={0: 'count'})
+
+            # Latency distribution: regression fixes
+            scatter = go.Scatter(
+                x=df_group_badfix_fixes['Commit_latency_upstream_stable_days'],
+                y=df_group_badfix_fixes['count'],
+                hovertemplate='<b>Regression fix commits</b><br>'
+                'Latency: %{x} days<br>'
+                'Number of commits: %{y}<br>'
+                '<extra></extra>',
+                name='Regression Fix Commits',
+            )
+            data.append(scatter)
+
+            # Latency distribution: regressions
+            scatter = go.Scatter(
+                x=df_group_badfixes['Commit_latency_upstream_stable_days'],
+                y=df_group_badfixes['count'],
+                hovertemplate='<b>Regression commits</b><br>'
+                'Latency: %{x} days<br>'
+                'Number of commits: %{y}<br>'
+                '<extra></extra>',
+                name='Regression Commits',
+            )
+            data.append(scatter)
+
+        layout = {
+            "title": {
+                "text": "<b>Latency Distribution: Regression/Fix Commits</b>",
+            },
+            "xaxis1": {
+                "title": "Latency, Upstream --> Stable (Days)",
+                "showgrid": True,
+            },
+            "yaxis1": {
+                "title": "Number of commits",
+                "showgrid": True,
+            },
+            "template": "plotly_white",
+        }
+
+        htmlfilename = outprefix + '__latency_regressions.html'
+        return self._plot_figure(htmlfilename, data, layout)
+
+    def plot_latency_vs_regression_lifetime(self, outprefix):
+        # Select all patches with latency information
+        df_latency = self.df_csv[self.df_csv['Commit_latency_upstream_stable_days'].notnull()]
+
+        # To get the latency for the regression commits, we need to:
+        # (1) Find the regressions (Badfix_hexsha) and their upstream lifetimes
+        # (2) Select from df_latency the commits where Badfix_hexsa == Commit_hexsha
+        #     to get to the relevant Commit_latency information
+
+        # (1)
+        df_badfixes = df_latency[[
+            'Badfix_hexsha',
+            'Badfix_lifetime_days',
+            'Badfix_upstream_lifetime_days_decimal',
+            'Badfix_upstream_lifetime_days',
+        ]]
+        df_badfixes = df_badfixes.drop_duplicates(subset='Badfix_hexsha', keep='last')
+        df_badfixes = df_badfixes[df_badfixes['Badfix_hexsha'].notnull()]
+
+        data = []
+
+        if not df_badfixes.empty:
+            # (2)
+            # After this merge, columns in the merged dataframe that have the
+            # "Commit_"-prefix refer the regression
+            df_badfixes = df_badfixes.merge(
+                df_latency,
+                how='inner',
+                left_on=['Badfix_hexsha'],
+                right_on=['Commit_hexsha'],
+                suffixes=('_left', '_right')
+            )
+
+            df_badfixes = df_badfixes[df_badfixes['Badfix_lifetime_days_left'] > 0]
+            df_autosel = df_badfixes[df_badfixes['Commit_autosel'] == 1]
+            df_nonautosel = df_badfixes[df_badfixes['Commit_autosel'] == 0]
+
+            # Hovertexts
+            hovertexts_autosel = []
+            hovertexts_nonautosel = []
+            for idx, row in df_badfixes.iterrows():
+                hovertext = \
+                    r'Regression commit: %s<br>'\
+                    r'Latency: %s days<br>'\
+                    r'Lifetime in upstream: %s days<br>'\
+                    r'Lifetime in stable: %s days<br>'\
+                    %\
+                    (
+                        row['Badfix_hexsha_left'][:12],
+                        int(round(row['Commit_latency_upstream_stable_days'])),
+                        int(round(row['Badfix_upstream_lifetime_days_left'])),
+                        int(round(row['Badfix_lifetime_days_left'])),
+                    )
+                if row['Commit_autosel'] == 1:
+                    hovertexts_autosel.append(hovertext)
+                else:
+                    hovertexts_nonautosel.append(hovertext)
+
+            # Latency vs upstream: autosel
+            scatter = go.Scatter(
+                x=df_autosel['Commit_latency_upstream_stable_days_decimal'],
+                y=df_autosel['Badfix_upstream_lifetime_days_decimal_left'],
+                name='Autosel commits',
+                hovertext=hovertexts_autosel,
+                hoverinfo=['text'] * len(hovertexts_autosel),
+                mode='markers',
+                marker=dict(
+                    color='rgba(255,0,0,0.2)',
+                    size=8,
+                    line=dict(width=0.5, color='Gray'),
+                ),
+            )
+            data.append(scatter)
+
+            # Latency vs upstream: non-autosel
+            scatter = go.Scatter(
+                x=df_nonautosel['Commit_latency_upstream_stable_days_decimal'],
+                y=df_nonautosel['Badfix_upstream_lifetime_days_decimal_left'],
+                name='Non-Autosel commits',
+                hovertext=hovertexts_nonautosel,
+                hoverinfo=['text'] * len(hovertexts_nonautosel),
+                mode='markers',
+                marker=dict(
+                    color='rgba(0,0,255,0.2)',
+                    size=8,
+                    line=dict(width=0.5, color='Gray'),
+                ),
+            )
+            data.append(scatter)
+
+        layout = {
+            "title": {
+                "text": "<b>Regression Lifetime in Upstream vs Latency</b>",
+            },
+            "xaxis1": {
+                "title": "Latency, Upstream --> Stable",
+                "showgrid": True,
+            },
+            "yaxis1": {
+                "title": "Regression Lifetime in Upstream (Days)",
+                "showgrid": True,
+            },
+            "template": "plotly_white",
+        }
+
+        htmlfilename = outprefix + '__latency_vs_regression_lifetime.html'
+        return self._plot_figure(htmlfilename, data, layout)
+
+    def plot_absolute_number_of_commits(self, outprefix):
+        df = self.df_csv
+        # We need to drop duplicate commit_hexsha values, since we are plotting
+        # all commits (commit_hexsha) not regressions (pair of
+        # [commit_hesha,badfix_hexsha])
+        df = df.drop_duplicates(subset=['Commit_hexsha'])
+        # Group autosel commits by the Commit_datetime (day)
+        df_autosel = df[df['Commit_autosel'] == 1]
+        df_group_autosel = df_autosel.groupby(
+            [df_autosel['Commit_datetime'].dt.date])\
+            .size()\
+            .reset_index()\
+            .rename(columns={0: 'count'})
+
+        # Group non-autosel commits by the Commit_datetime (day)
+        df_nonautosel = df[df['Commit_autosel'] == 0]
+        df_group_nonautosel = df_nonautosel.groupby(
+            [df_nonautosel['Commit_datetime'].dt.date])\
+            .size()\
+            .reset_index()\
+            .rename(columns={0: 'count'})
+
+        # Find the max y-value from the dataset
+        maxy = max(
+            df_group_autosel['count'].max(),
+            df_group_nonautosel['count'].max())
+        maxy = 1.1 * maxy
+
+        annotations = []
+        releases = []
+        autoselcommits = []
+        nonautoselcommits = []
+        previous_date = None
+        i = -1
+        for tag in self.release_tags:
+            i += 1
+            df_commits = self.df_csv[self.df_csv['Commit_tag'] == tag]
+            n_commits = df_commits.shape[0]
+            n_autosel_commits = df_commits[df_commits['Commit_autosel'] == 1].shape[0]
+            n_nonautosel_commits = df_commits[df_commits['Commit_autosel'] == 0].shape[0]
+            release_date = self.mapreltodate.get(tag)
+
+            if previous_date is not None and release_date == previous_date:
+                # We need to make adjustments to the graphs if there
+                # is more than one release on the same date.
+                duplicate_date = True
+            else:
+                duplicate_date = False
+
+            # Vertical lines for each release
+            hovertext_rel =\
+                r'<b>%s</b><br \>'\
+                r'Date: %s<br \>'\
+                r'Commits: %s<br \>'\
+                % \
+                (tag, release_date, n_commits)
+            release = go.Scatter(
+                x=[release_date, release_date],
+                y=[0, maxy],
+                mode='lines+markers',
+                name=tag,
+                hovertext=hovertext_rel,
+                hoverinfo="text",
+                line=dict(dash='dot', color='lightgray', width=0.8),
+                marker=dict(color='lightgray', size=3),
+                legendgroup="Release version",
+                showlegend=False,
+                yaxis="y",
+            )
+
+            rd = relativedelta(minutes=(10 * 60))
+
+            # Vertical lines for autosel commits
+            hovertext_auto =\
+                r'<b>%s</b><br \>'\
+                r'Date: %s<br \>'\
+                r'Autosel commits: %s<br \>'\
+                % \
+                (tag, release_date, n_autosel_commits)
+            autoselcommit = go.Scatter(
+                x=[release_date - rd, release_date - rd],
+                y=[0, n_autosel_commits],
+                mode='lines+markers',
+                name="Autosel commits",
+                hovertext=hovertext_auto,
+                hoverinfo="text",
+                line=dict(color='rgba(255,0,0,0.5)', width=1),
+                marker=dict(color='rgba(255,0,0,0.5)', size=3),
+                legendgroup="Autosel commits",
+                showlegend=(i == 0),
+                yaxis="y",
+            )
+
+            # Vertical lines for non-autosel commits
+            hovertext_nonauto =\
+                r'<b>%s</b><br \>'\
+                r'Date: %s<br \>'\
+                r'Non-Autosel commits: %s<br \>'\
+                % \
+                (tag, release_date, n_nonautosel_commits)
+            nonautoselcommit = go.Scatter(
+                x=[release_date + rd, release_date + rd],
+                y=[0, n_nonautosel_commits],
+                mode='lines+markers',
+                name="Non-Autosel commits",
+                hovertext=hovertext_nonauto,
+                hoverinfo="text",
+                line=dict(color='darkgray', width=1),
+                marker=dict(color='darkgray', size=3),
+                legendgroup="Non-Autosel commits",
+                showlegend=(i == 0),
+                yaxis="y",
+            )
+
+            if duplicate_date:
+                release = releases[-1]
+                release.hovertext += r"---<br \>" + hovertext_rel
+                autoselcommit = autoselcommits[-1]
+                autoselcommit.y = [0, autoselcommit.y[1] + n_autosel_commits]
+                autoselcommit.hovertext += r"---<br \>" + hovertext_auto
+                nonautoselcommit = nonautoselcommits[-1]
+                nonautoselcommit.y = [0, nonautoselcommit.y[1] + n_nonautosel_commits]
+                nonautoselcommit.hovertext += r"---<br \>" + hovertext_nonauto
+            else:
+                releases.append(release)
+                autoselcommits.append(autoselcommit)
+                nonautoselcommits.append(nonautoselcommit)
+
+            # Annotation: release version number
+            # (show annotation on every tenth release version)
+            if i % 10 == 0:
+                annotation = {
+                    'x': release_date,
+                    'y': maxy,
+                    'xref': 'x',
+                    'yref': 'y',
+                    'text': tag,
+                    'textangle': -45,
+                    'showarrow': True,
+                    'arrowhead': 1,
+                    'arrowsize': 0.5,
+                    'arrowwidth': 1,
+                    'arrowcolor': 'lightgray',
+                    'ax': 0,
+                }
+                annotations.append(annotation)
+
+            previous_date = release_date
+
+        data = []
+        data.extend(releases)
+        data.extend(autoselcommits)
+        data.extend(nonautoselcommits)
+
+        layout = {
+            "title": {
+                "text": "<b>Absolute Number of Commits</b>",
+                "xref": "paper",
+                "x": 0,
+            },
+            "xaxis1": {
+                "title": "Date",
+                "showgrid": True,
+                "tickformat": "%Y-%m-%d",
+            },
+            "yaxis1": {
+                "title": "Number of Commits",
+                "showgrid": True,
+            },
+            "hovermode": "closest",
+            "annotations": annotations,
+            "template": "plotly_white",
+        }
+
+        htmlfilename = outprefix + '__absolute_number_of_commits.html'
         return self._plot_figure(htmlfilename, data, layout)
 
     def plot_summary(self, outprefix, plot_names):
@@ -1095,6 +1478,15 @@ class Plotter:
             include_plotlyjs=self.include_plotlyjs)
         print("[+] Wrote file: %s" % ret)
         return ret
+
+    def df_to_csv_file(self, df, name):
+        import csv
+        df.to_csv(
+            path_or_buf=name,
+            quoting=csv.QUOTE_ALL,
+            sep=",", index=False, encoding='utf-8')
+        print("[+] Wrote: %s" % name)
+
 
 ################################################################################
 
@@ -1141,11 +1533,15 @@ if __name__ == "__main__":
     print("[+] Reading: %s" % csv_file)
     plotter = Plotter(csv_file, plotlyjs)
     plot_names = []
+    plot_names.append(plotter.plot_absolute_number_of_commits(outprefix))
     plot_names.append(plotter.plot_regression_events(outprefix))
     plot_names.append(plotter.plot_regression_fix_events(outprefix))
     plot_names.append(plotter.plot_badfix_ratio(outprefix))
     plot_names.append(plotter.plot_notfound_ratio(outprefix))
-    plot_names.append(plotter.plot_lifetime_stable_vs_mainline(outprefix))
+    plot_names.append(plotter.plot_lifetime_stable_vs_upstream(outprefix))
+    plot_names.append(plotter.plot_latency_distribution_all_commits(outprefix))
+    plot_names.append(plotter.plot_latency_distribution_regression_commits(outprefix))
+    plot_names.append(plotter.plot_latency_vs_regression_lifetime(outprefix))
     plotter.plot_summary(outprefix, plot_names)
 
 ################################################################################

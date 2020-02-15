@@ -14,6 +14,7 @@ from pathlib import Path
 import subprocess
 import pandas as pd
 from tabulate import tabulate
+import re
 
 ################################################################################
 
@@ -45,6 +46,7 @@ def print_table(dict, out=sys.stdout):
 
 def generate_readme(
         dst,
+        summary,
         regression_charts,
         missing_annotations,
         regression_lifetimes,
@@ -61,6 +63,9 @@ as provide links to download the raw data in CSV format.
 
         print("## Data\n", file=out)
         print_table(regression_charts, out)
+
+        print("## Summary\n", file=out)
+        print_table(summary, out)
 
         print("## Missing Annotations\n", file=out)
         print_table(missing_annotations, out)
@@ -79,17 +84,20 @@ def summarize(db_list, dst):
     missing_annotations = {}
     regression_lifetimes = {}
     multiple_fixes = {}
+    summary = {}
 
     for db in db_list:
         df = pd.read_csv(
             db['fullfilename'], na_values=['None'], keep_default_na=True)
-        commits = df.shape[0]
+        df_uniq = df.drop_duplicates(subset=['Commit_hexsha'])
+        commits = df_uniq.shape[0]
         if commits == 0:
             print("Warning: no commits: %s" % db['fullfilename'])
             continue
         fromtag = db['first_tag']
         totag = db['last_tag']
 
+        # Data
         chartname = "%s__summary.html" % db['filename']
         csvname = db['filename']
         setcol = regression_charts.setdefault
@@ -99,14 +107,16 @@ def summarize(db_list, dst):
         setcol('Regression CSV Database', []).append(
             "[%s](%s)" % (csvname, csvname))
 
-        tagged = df[df['Matched_by'].notnull()].shape[0]
+        # Missing Annotations
+        tagged = df_uniq[df_uniq['Matched_by'].notnull()].shape[0]
         tagged_pct = '{:.0%}'.format(tagged / commits)
         setcol = missing_annotations.setdefault
         setcol('Version', []).append("%s to %s" % (fromtag, totag))
         setcol('Commits', []).append(commits)
-        setcol('Commits_tagged', []).append(tagged)
-        setcol('Commits_tagged (%)', []).append(tagged_pct)
+        setcol('Commits tagged', []).append(tagged)
+        setcol('Commits tagged (%)', []).append(tagged_pct)
 
+        # Regression Lifetimes
         df_regrs = df[df['Badfix_hexsha'].notnull()]
         regrs = df_regrs.shape[0]
         if regrs == 0:
@@ -120,8 +130,9 @@ def summarize(db_list, dst):
         setcol('Regressions <br>(lifetime any)', []).append(regrs)
         setcol('Regressions <br>(lifetime == 0)', []).append(regrs_eq_0)
         setcol('Regressions <br>(lifetime < 0)', []).append(regrs_lt_0)
-        setcol('Regressions <br>(lifetime <= 0)(%)', []).append(regrs_le_0_pct)
+        setcol('Regressions <br>(lifetime <= 0) (%)', []).append(regrs_le_0_pct)
 
+        # Multiple Fixes to One Regression
         df_regrs_gt_0 = df_regrs[df_regrs['Badfix_lifetime_days'] > 0]
         regrs_gt_0 = df_regrs_gt_0.shape[0]
         dfg = df_regrs_gt_0.groupby(['Badfix_hexsha'])\
@@ -140,8 +151,43 @@ def summarize(db_list, dst):
         setcol('Regressions <br>(Fixes == 3)', []).append(regrs_fixes_3)
         setcol('Regressions <br>(Fixes >= 4)', []).append(regrs_fixes_ge_4)
 
+        # Summary
+        regrs_rate_pct = '{:.1%}'.format(regrs_gt_0 / commits)
+        # How many regressions have required more than one fix?
+        regrs_fixes_gt_1_count = dfg[dfg['count'] > 1].shape[0]
+        # How many fixes did those regressions require?
+        regrs_fixes_gt_1_sum = dfg[dfg['count'] > 1]['count'].sum()
+        # Assuming regressions with multiple fixes should, in fact, be counted
+        # as one regression, what is the upward skew?
+        regrs_multi_fixes_impact = regrs_fixes_gt_1_sum - regrs_fixes_gt_1_count
+        regrs_rate_est_min_pct = '{:.1%}'.format(
+            (regrs_gt_0 - regrs_multi_fixes_impact) / commits)
+        regrs_rate_est_max_pct = '{:.1%}'.format(regrs_gt_0 / tagged)
+        regrs_rate_est_pct = '%s - %s' % (
+            regrs_rate_est_min_pct, regrs_rate_est_max_pct)
+        # For now, we'll simply read the Half-life calculated by badfixplot.py:
+        badfixnotfound = "%s__badfixnotfound.html" % db['fullfilename']
+        re_halflife = re.compile(r'Half-life: (?P<halflife>\d+) days')
+        halflife = ''
+        with open(badfixnotfound, 'r') as f:
+            for line in f:
+                match = re_halflife.search(line)
+                if match:
+                    halflife = match.group('halflife')
+                    break
+        setcol = summary.setdefault
+        setcol('Version', []).append("%s to %s" % (fromtag, totag))
+        setcol('Commits', []).append(commits)
+        setcol('Commits Tagged (%)', []).append(tagged_pct)
+        setcol('Regression <br>Rate (%)', []).append(regrs_rate_pct)
+        setcol('Regression Rate<br>Range Estimation (%)', []).append(
+            regrs_rate_est_pct)
+        setcol('Zero-Lifetime Regressions <br>(lifetime <= 0) (%)', []).append(regrs_le_0_pct)
+        setcol('Half-life (days)', []).append(halflife)
+
     return generate_readme(
         dst,
+        summary,
         regression_charts,
         missing_annotations,
         regression_lifetimes,
