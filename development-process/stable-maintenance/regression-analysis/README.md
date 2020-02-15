@@ -14,43 +14,43 @@ as provide links to download the raw data in CSV format.
 
 |      Version       |                                       Regression HTML Charts                                       |                        Regression CSV Database                         |
 |:------------------:|:--------------------------------------------------------------------------------------------------:|:----------------------------------------------------------------------:|
-| v4.19 to v4.19.98  |  [linux_stable__v4.19-v4.19.98.csv__summary.html](linux_stable__v4.19-v4.19.98.csv__summary.html)  |  [linux_stable__v4.19-v4.19.98.csv](linux_stable__v4.19-v4.19.98.csv)  |
-| v4.14 to v4.14.167 | [linux_stable__v4.14-v4.14.167.csv__summary.html](linux_stable__v4.14-v4.14.167.csv__summary.html) | [linux_stable__v4.14-v4.14.167.csv](linux_stable__v4.14-v4.14.167.csv) |
-|  v4.9 to v4.9.211  |   [linux_stable__v4.9-v4.9.211.csv__summary.html](linux_stable__v4.9-v4.9.211.csv__summary.html)   |   [linux_stable__v4.9-v4.9.211.csv](linux_stable__v4.9-v4.9.211.csv)   |
-|  v4.4 to v4.4.211  |   [linux_stable__v4.4-v4.4.211.csv__summary.html](linux_stable__v4.4-v4.4.211.csv__summary.html)   |   [linux_stable__v4.4-v4.4.211.csv](linux_stable__v4.4-v4.4.211.csv)   |
+| v4.19 to v4.19.104 | [linux_stable__v4.19-v4.19.104.csv__summary.html](linux_stable__v4.19-v4.19.104.csv__summary.html) | [linux_stable__v4.19-v4.19.104.csv](linux_stable__v4.19-v4.19.104.csv) |
+| v4.14 to v4.14.171 | [linux_stable__v4.14-v4.14.171.csv__summary.html](linux_stable__v4.14-v4.14.171.csv__summary.html) | [linux_stable__v4.14-v4.14.171.csv](linux_stable__v4.14-v4.14.171.csv) |
+|  v4.9 to v4.9.214  |   [linux_stable__v4.9-v4.9.214.csv__summary.html](linux_stable__v4.9-v4.9.214.csv__summary.html)   |   [linux_stable__v4.9-v4.9.214.csv](linux_stable__v4.9-v4.9.214.csv)   |
+|  v4.4 to v4.4.214  |   [linux_stable__v4.4-v4.4.214.csv__summary.html](linux_stable__v4.4-v4.4.214.csv__summary.html)   |   [linux_stable__v4.4-v4.4.214.csv](linux_stable__v4.4-v4.4.214.csv)   |
 
 ## Summary
 
 |      Version       |  Commits  |  Commits Tagged (%)  |  Regression <br>Rate (%)  |  Regression Rate<br>Range Estimation (%)  |  Zero-Lifetime Regressions <br>(lifetime <= 0) (%)  |  Half-life (days)  |
 |:------------------:|:---------:|:--------------------:|:-------------------------:|:-----------------------------------------:|:---------------------------------------------------:|:------------------:|
-| v4.19 to v4.19.98  |   10901   |         45%          |           3.9%            |                3.6% - 8.5%                |                         29%                         |         63         |
-| v4.14 to v4.14.167 |   15049   |         42%          |           5.1%            |               4.4% - 12.2%                |                         26%                         |         77         |
-|  v4.9 to v4.9.211  |   15308   |         40%          |           5.1%            |               4.5% - 12.8%                |                         24%                         |         91         |
-|  v4.4 to v4.4.211  |   13973   |         36%          |           4.6%            |               4.1% - 12.9%                |                         28%                         |         80         |
+| v4.19 to v4.19.104 |   12008   |         49%          |           3.8%            |                3.5% - 7.7%                |                         30%                         |         63         |
+| v4.14 to v4.14.171 |   15699   |         44%          |           5.1%            |               4.4% - 11.6%                |                         26%                         |         78         |
+|  v4.9 to v4.9.214  |   15762   |         41%          |           5.0%            |               4.5% - 12.3%                |                         25%                         |         90         |
+|  v4.4 to v4.4.214  |   14301   |         37%          |           4.6%            |               4.1% - 12.6%                |                         28%                         |         82         |
 
 ## Missing Annotations
 
 |      Version       |  Commits  |  Commits tagged  |  Commits tagged (%)  |
 |:------------------:|:---------:|:----------------:|:--------------------:|
-| v4.19 to v4.19.98  |   10901   |       4948       |         45%          |
-| v4.14 to v4.14.167 |   15049   |       6368       |         42%          |
-|  v4.9 to v4.9.211  |   15308   |       6047       |         40%          |
-|  v4.4 to v4.4.211  |   13973   |       4962       |         36%          |
+| v4.19 to v4.19.104 |   12008   |       5857       |         49%          |
+| v4.14 to v4.14.171 |   15699   |       6901       |         44%          |
+|  v4.9 to v4.9.214  |   15762   |       6417       |         41%          |
+|  v4.4 to v4.4.214  |   14301   |       5227       |         37%          |
 
 ## Regression Lifetimes
 
 |      Version       |  Regressions <br>(lifetime any)  |  Regressions <br>(lifetime == 0)  |  Regressions <br>(lifetime < 0)  |  Regressions <br>(lifetime <= 0) (%)  |
 |:------------------:|:--------------------------------:|:---------------------------------:|:--------------------------------:|:-------------------------------------:|
-| v4.19 to v4.19.98  |               591                |                165                |                5                 |                  29%                  |
-| v4.14 to v4.14.167 |               1045               |                266                |                4                 |                  26%                  |
-|  v4.9 to v4.9.211  |               1025               |                244                |                5                 |                  24%                  |
-|  v4.4 to v4.4.211  |               893                |                250                |                2                 |                  28%                  |
+| v4.19 to v4.19.104 |               649                |                191                |                5                 |                  30%                  |
+| v4.14 to v4.14.171 |               1081               |                279                |                4                 |                  26%                  |
+|  v4.9 to v4.9.214  |               1044               |                252                |                5                 |                  25%                  |
+|  v4.4 to v4.4.214  |               912                |                253                |                2                 |                  28%                  |
 
 ## Multiple Fixes to One Regression
 
 |      Version       |  Regressions <br>(lifetime > 0)  |  Regressions <br>(Fixes == 1)  |  Regressions <br>(Fixes == 2)  |  Regressions <br>(Fixes == 3)  |  Regressions <br>(Fixes >= 4)  |
 |:------------------:|:--------------------------------:|:------------------------------:|:------------------------------:|:------------------------------:|:------------------------------:|
-| v4.19 to v4.19.98  |               421                |              359               |               26               |               2                |               1                |
-| v4.14 to v4.14.167 |               775                |              588               |               58               |               13               |               7                |
-|  v4.9 to v4.9.211  |               776                |              631               |               48               |               10               |               4                |
-|  v4.4 to v4.4.211  |               641                |              523               |               37               |               7                |               5                |
+| v4.19 to v4.19.104 |               453                |              387               |               28               |               2                |               1                |
+| v4.14 to v4.14.171 |               798                |              601               |               63               |               13               |               7                |
+|  v4.9 to v4.9.214  |               787                |              638               |               50               |               10               |               4                |
+|  v4.4 to v4.4.214  |               657                |              535               |               39               |               7                |               5                |
