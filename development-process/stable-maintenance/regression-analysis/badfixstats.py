@@ -9,8 +9,9 @@ import csv
 import argparse
 import os
 import sys
+import pickle
 
-from pandas import DataFrame
+import pandas as pd
 from collections import OrderedDict
 from datetime import datetime, timedelta
 
@@ -19,7 +20,7 @@ from datetime import datetime, timedelta
 
 class GitStatistics:
 
-    def __init__(self, gitdir, rev, inscopefile=""):
+    def __init__(self, gitdir, rev, indexfile, nomerges, inscopefile=""):
         self.gitdir = gitdir
         # Statistics are generated based on the git commit entries in the
         # specified git repository that match the given revision (range)
@@ -27,8 +28,6 @@ class GitStatistics:
         # Dictionary to store the report entries
         # Key: column header, Value: list of entries
         self.entries = {}
-        # List of all column names
-        self.allcolumns = []
         # GitPython Repo object
         self.repo = git.Repo(self.gitdir)
         # Set of commit hashes in self.repo between [beg,end]
@@ -58,18 +57,30 @@ class GitStatistics:
         # Key: commit hash, Value: list of names
         self.signedoffmap = {}
         self._build_signedoffmap()
+        # Map upstream commit hash to upstream tag name
+        self.upstreamtagmap = {}
+        # The name of the file that stores the index on the disk.
+        # "index" is dictionary that maps upstream_hexsha to merge commit
+        self.indexfilename = None if nomerges else indexfile
+        self.index = {}
+        self._load_index()
 
     def find_badfixes(self):
         for commit in list(self.repo.iter_commits(self.rev, reverse=True)):
             self._find_badfix(commit)
 
-        self.allcolumns = list(self.entries.keys())
-        # The order of self.allcolumns determines the order of the columns
-        # in the CSV out file
-        self.allcolumns.sort()
+        self._find_upstream_tags()
+        if self.indexfilename:
+            print("[+] Finding merge commits, this might take several minutes "
+                  "if the index is not up-to-date")
+            self._find_upstream_merge_commits()
+            self._add_final_columns()
+            self._save_index()
 
     def to_csv(self, filename):
-        df = DataFrame(self.entries, columns=self.allcolumns)
+        df = pd.DataFrame(self.entries)
+        # Sort columns alphabetically
+        df = df.sort_index(axis=1)
         df.to_csv(path_or_buf=filename, quoting=csv.QUOTE_ALL,
                   sep=",", index=False, encoding='utf-8')
 
@@ -155,7 +166,9 @@ class GitStatistics:
         if not badfix_upstream_commit or not commit_upstream_commit:
             badfix_upstream_lifetime_days_decimal = ""
             badfix_upstream_lifetime_days = ""
+            badfix_upstream_datetime = ""
         else:
+            badfix_upstream_datetime = badfix_upstream_commit.committed_datetime
             badfix_upstream_timedelta = \
                 commit_upstream_commit.committed_datetime - \
                 badfix_upstream_commit.committed_datetime
@@ -198,7 +211,7 @@ class GitStatistics:
         setcol('Commit_latency_upstream_stable_days_decimal', []).append(
             commit_latency_us_days_decimal)
         setcol('Commit_upstream_hexsha', []).append(commit_upstream_hexsha)
-        setcol('Commit_upstream_committed', []).append(
+        setcol('Commit_upstream_datetime', []).append(
             commit_upstream_committed)
         setcol('Commit_autosel', []).append(commit_autosel)
         setcol('Badfix_hexsha', []).append(badfix_sha)
@@ -213,6 +226,8 @@ class GitStatistics:
             badfix_upstream_lifetime_days)
         setcol('Badfix_upstream_lifetime_days_decimal', []).append(
             badfix_upstream_lifetime_days_decimal)
+        setcol('Badfix_upstream_datetime', []).append(badfix_upstream_datetime)
+
         setcol('Found_by', []).append(found_by)
         setcol('In_scope', []).append(inscope)
         setcol('Matched_by', []).append(";".join(matched_by_list))
@@ -307,6 +322,263 @@ class GitStatistics:
                 if badfix not in self.commitset:
                     badfix = ""
         return (badfix, found_by, matched_by)
+
+    def _load_index(self):
+        # Load an earlier index from the disk: index is dictionary that maps
+        # upstream_hexsha to merge commit
+        if self.indexfilename and os.path.isfile(self.indexfilename):
+            with open(self.indexfilename, 'rb') as handle:
+                self.index = pickle.load(handle)
+                fname = os.path.abspath(os.path.realpath(handle.name))
+                print("[+] Note: using earlier index file: \"%s\"" % fname)
+
+    def _save_index(self):
+        # Save the index to disk
+        if self.indexfilename:
+            with open(self.indexfilename, 'wb') as handle:
+                pickle.dump(self.index, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                fname = os.path.abspath(os.path.realpath(handle.name))
+                print("[+] Note: updated index to file: \"%s\"" % fname)
+
+    def _find_merged_tree(self, merge_commit):
+        if not merge_commit:
+            return ""
+        RE_MERGE = re.compile(
+            r'^\s*Merge\s.*(?P<tree>(?:git:|https:|ssh:|\(|gitolite).+)\s*$')
+        tree = ""
+        summary = merge_commit.summary
+        match = RE_MERGE.match(summary)
+        if match:
+            tree = match.group('tree')
+        return tree
+
+    def _stamp_upstream_merge_commit(self, merge_hexsha):
+        setcol = self.entries.setdefault
+        merge_commit = self._get_commit(merge_hexsha)
+        merge_commit_dt = merge_commit.committed_datetime if merge_commit else ""
+
+        # Find the source tree from the merge_commit message
+        tree = self._find_merged_tree(merge_commit)
+
+        setcol("Commit_upstream_merge_hexsha", []).append(merge_hexsha)
+        setcol("Commit_upstream_merge_datetime", []).append(merge_commit_dt)
+        setcol("Commit_upstream_merge_tree", []).append(tree)
+
+    def _stamp_badfix_upstream_merge_commit(
+            self, badfix_merge_hexsha, fix_merge_hexsha):
+        setcol = self.entries.setdefault
+        badfix_merge_commit = self._get_commit(badfix_merge_hexsha)
+        fix_merge_commit = self._get_commit(fix_merge_hexsha)
+        badfix_dt = badfix_merge_commit.committed_datetime if badfix_merge_commit else ""
+        fix_dt = fix_merge_commit.committed_datetime if fix_merge_commit else ""
+        if not badfix_dt or not fix_dt:
+            badfix_upstream_merge_lifetime_days_decimal = ""
+            badfix_upstream_merge_lifetime_days = ""
+        else:
+            badfix_upstream_merge_timedelta = fix_dt - badfix_dt
+            badfix_upstream_merge_lifetime_days_decimal = \
+                badfix_upstream_merge_timedelta / timedelta(days=1)
+            badfix_upstream_merge_lifetime_days = \
+                int(round(badfix_upstream_merge_timedelta / timedelta(days=1)))
+        setcol("Badfix_upstream_merge_hexsha", []).append(badfix_merge_hexsha)
+        setcol("Badfix_upstream_merge_datetime", []).append(badfix_dt)
+        setcol("Badfix_upstream_merge_lifetime_days", []).append(
+            badfix_upstream_merge_lifetime_days)
+        setcol("Badfix_upstream_merge_lifetime_days_decimal", []).append(
+            badfix_upstream_merge_lifetime_days_decimal)
+
+    def _stamp_upstream_merge_latency(
+            self, commit_datetime, commit_upstream_merge_datetime):
+
+        setcol = self.entries.setdefault
+        if not commit_datetime or not commit_upstream_merge_datetime:
+            commit_latency_ums_days = ""
+            commit_latency_ums_days_decimal = ""
+        if commit_datetime and commit_upstream_merge_datetime:
+            commit_latency_ums_timedelta = \
+                commit_datetime - commit_upstream_merge_datetime
+            commit_latency_ums_days_decimal = \
+                commit_latency_ums_timedelta / timedelta(days=1)
+            commit_latency_ums_days = \
+                int(round(commit_latency_ums_timedelta / timedelta(days=1)))
+
+        setcol("Commit_latency_upstream_merge_stable_days", []).append(
+            commit_latency_ums_days)
+        setcol("Commit_latency_upstream_merge_stable_days_decimal", []).append(
+            commit_latency_ums_days_decimal)
+
+    def _add_final_columns(self):
+        number_of_rows = len(self.entries['Commit_hexsha'])
+
+        for i in range(number_of_rows):
+            badfix_upstream_hexsha = self.entries['Badfix_upstream_hexsha'][i]
+            badfix_merge_hexsha = ""
+            if badfix_upstream_hexsha:
+                badfix_merge_hexsha = self.index.get(
+                    badfix_upstream_hexsha, [""])[0]
+            commit_upstream_merge_hexsha = self.entries[
+                'Commit_upstream_merge_hexsha'][i]
+            self._stamp_badfix_upstream_merge_commit(
+                badfix_merge_hexsha,
+                commit_upstream_merge_hexsha)
+
+            commit_datetime = self.entries['Commit_datetime'][i]
+            commit_upstream_merge_datetime = self.entries['Commit_upstream_merge_datetime'][i]
+            self._stamp_upstream_merge_latency(
+                commit_datetime,
+                commit_upstream_merge_datetime)
+
+            i += 1
+
+    def _find_upstream_merge_commits(self):
+        # Iterate all the upstream commits and attempt to find the merge
+        # commit that originally brought in the commit to the upstream
+        # branch
+        for upstream_hexsha in self.entries['Commit_upstream_hexsha']:
+            merge_commit = ""
+            upstream_tag = self.upstreamtagmap.get(upstream_hexsha, "")
+
+            # We cannot determine the merge commit if upstream_hexsha or
+            # upstream_tag are missing
+            if not upstream_hexsha or not upstream_tag:
+                self._stamp_upstream_merge_commit("")
+                continue
+
+            # Use the value from the index if it's already there
+            if upstream_hexsha in self.index:
+                merge_commit = self.index[upstream_hexsha][0]
+                self._stamp_upstream_merge_commit(merge_commit)
+                continue
+
+            # Otherwise, try to find the merge commit as explained in:
+            # https://stackoverflow.com/questions/8475448/
+            ancestry_path_list = self.repo.git.rev_list(
+                "%s..%s" % (upstream_hexsha, upstream_tag),
+                ancestry_path=True).split()
+
+            first_parent_set = set(self.repo.git.rev_list(
+                "%s..%s" % (upstream_hexsha, upstream_tag),
+                first_parent=True).split())
+
+            for commit in reversed(ancestry_path_list):
+                if commit in first_parent_set:
+                    merge_commit = commit
+                    break
+
+            if merge_commit:
+                merged_list = []
+                try:
+                    # What commits were merged with the suspected merge_commit?
+                    merged_list = self.repo.git.rev_list(
+                        "%s^1..%s^2" % (merge_commit, merge_commit)).split()
+                except git.GitCommandError as err:
+                    # If the git command throws an exception it's likely
+                    # due to the merge_commit not being a merge commit
+                    # after all. Here, we check the stderr for an expected
+                    # error message which would indicate the merge_commit was
+                    # not a merge commit
+                    expected_error = re.search(
+                        "ambiguous argument.*unknown revision", err.stderr)
+
+                    # Groan if the error message was something other than what
+                    # we expected
+                    if not expected_error:
+                        print(" unecpected error message: %s" % err.stderr)
+                        print(" stdout: %s" % err.stdout)
+                        print(" command: %s" % err.command)
+
+                merged_set = set(merged_list)
+                if upstream_hexsha not in merged_set:
+                    # We end up here if upstrem_hexsha was a direct commit to
+                    # the target branch, a fast forward merge, or some
+                    # other corner case. For all these cases, we simply
+                    # leave the merge_commit empty. To update the index
+                    # with the information that upstream_hexsha is not
+                    # associated to any known merge_commit, we manually
+                    # insert the upstream_hexsha to the merged_list and mark
+                    # merge_commit as empty:
+                    merge_commit = ""
+                    merged_list = [upstream_hexsha]
+                    # print("[+] Note: no merge found: %s" % upstream_hexsha)
+
+                # Update the index
+                # Store all the commits merged with merge_commit into an index:
+                # Key: upstream_hexsha
+                # Value: list of merge commits
+                for commit in merged_list:
+                    merge_list = self.index.setdefault(commit, [])
+                    if merge_commit not in merge_list:
+                        merge_list.append(merge_commit)
+
+            # "stamp" the merge_commit (or empty value if it wasn't found)
+            self._stamp_upstream_merge_commit(merge_commit)
+
+    def _find_upstream_tags(self):
+        # Get unique Commit_upstream_hexsha entries
+        upstream_hexsha_set = set(self.entries['Commit_upstream_hexsha'])
+        # Remove empty if any
+        upstream_hexsha_set.discard("")
+        if len(upstream_hexsha_set) <= 0:
+            print("[+] Warning: no upstream references")
+            return
+
+        # Get the upstream commit tag by calling
+        # git describe --contains LIST_OF_HEXSHA
+        upstream_hexsha_list = list(upstream_hexsha_set)
+        status, out, err = self.repo.git.describe(
+            upstream_hexsha_list,
+            contains=True,
+            with_extended_output=True)
+        if status != 0:
+            print("[+] Warning: getting upstream tags failed")
+            return
+
+        if err:
+            # git describe might fail to find upstream tags for upstream
+            # commits if the Commit_upstream_hexsha is incorrect. For these
+            # cases, git runs successfully but outputs to stderr an error
+            # message such as the following:
+            #   "Could not get object for HEXSHA. Skipping.""
+            # Here, we match such lines from the stderr and remove the matching
+            # HEXSHAs from the upstream_hexsha_list
+            err_list = re.findall(
+                r'Could not get object for ([0-9a-f]{10,40})', err, re.MULTILINE)
+            # If no matches were found, stderr is due to a different error.
+            # Groan, then give up trying to find the upstream tags
+            if not err_list:
+                print(
+                    "[+] Warning: getting upstream tags returned unexpected "
+                    "stderr: %s" % err)
+                return
+            upstream_hexsha_list = [
+                i for i in upstream_hexsha_list if i not in err_list]
+
+        upstream_tag_list = out.splitlines()
+        if len(upstream_hexsha_list) != len(upstream_tag_list):
+            print(
+                "[+] Warning: number of upstream hexshas and tags does "
+                "not match")
+            return
+
+        # Build the upsteramtagmap
+        self.upstreamtagmap = {}
+        for tag, hexsha in zip(upstream_tag_list, upstream_hexsha_list):
+            # Ignore everything after (and including) the
+            # first '~' from the upstream tag,
+            # so e.g. 'v5.2-rc4~12^2~1^2~1^2~5' becomes 'v5.2-rc4'
+            self.upstreamtagmap[hexsha] = tag.split('~', 1)[0]
+
+        # Add field "Commit_upstream_tag" to entries
+        setcol = self.entries.setdefault
+        for commit in self.entries['Commit_upstream_hexsha']:
+            tag = self.upstreamtagmap.get(commit, "")
+            setcol('Commit_upstream_tag', []).append(tag)
+
+        # Add field "Badfix_upstream_tag" to entries
+        setcol = self.entries.setdefault
+        for commit in self.entries['Badfix_upstream_hexsha']:
+            tag = self.upstreamtagmap.get(commit, "")
+            setcol('Badfix_upstream_tag', []).append(tag)
 
     def _build_commitset(self):
         try:
@@ -440,6 +712,28 @@ def getargs():
     parser.add_argument('--out', nargs='?', help=help, default='badfixes.csv')
 
     help = \
+        "set the index file name, default is 'index.pickle' "\
+        "(\"index\" is a dictionary that maps upstream_hexsha to merge "\
+        "commit; the script serializes/de-serializes the dictionary "\
+        "in an attempt to avoid the relatively costly operation "\
+        "of finding the merge "\
+        "commit information). Note: the script will create "\
+        "the index file if "\
+        "it doesn't exist. Otherwise, the script updates the given "\
+        "index file appending "\
+        "any new merge commit mappings to the specified file."
+    parser.add_argument(
+        '--index-file', nargs='?', help=help, default='index.pickle')
+
+    help = \
+        "setting this flag changes the output csv so that merge-related " \
+        "datapoints will not be included into the output. This will " \
+        "improve the script execution time, due to completely " \
+        "disabling the relatively costly operation of finding the merge " \
+        "commit information."
+    parser.add_argument('--no-merge-datapoints', help=help, action='store_true')
+
+    help = \
         "file path to patchlist file, which contains commit hashes "\
         "(one per line) that should be considered in-scope. If omitted, "\
         "all commits are considered in-scope."
@@ -458,7 +752,9 @@ if __name__ == "__main__":
     rev = args.REV[0]
     repo = args.git_dir
     outfile = args.out
+    indexfile = args.index_file
     inscopefile = args.inscope
+    nomerges = args.no_merge_datapoints
 
     repo = repo if repo.endswith(".git") else os.path.join(repo, ".git")
     if(not (os.path.isdir(repo))):
@@ -466,7 +762,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     print("[+] Reading commit history, this might take a few minutes")
-    stats = GitStatistics(repo, rev, inscopefile)
+    stats = GitStatistics(repo, rev, indexfile, nomerges, inscopefile)
     stats.find_badfixes()
 
     stats.to_csv(outfile)
