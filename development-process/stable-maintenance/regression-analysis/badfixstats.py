@@ -69,7 +69,7 @@ class GitStatistics:
             self._find_badfix(commit)
 
         # Build the upstream tagmap now when the 'Commit_upstream_hexsha'
-        # is known for the commits we are interested of
+        # is known
         upstream_hexshas = self.entries['Commit_upstream_hexsha']
         self.upstreamtagmap = self._build_tagmap(hexsha_list=upstream_hexshas)
         self._find_upstream_tags()
@@ -625,18 +625,32 @@ class GitStatistics:
         # each sublist separately to not exceed the git argument
         # list length limit
         hexsha_list_chunks = _split_list(hexsha_list, 5000)
-        out = ''
+        gitout = ''
         # Get the tags by calling git describe --contains for the list of commits
         for hexsha_chunk in hexsha_list_chunks:
-            out += "\n" + \
-                self.repo.git.describe(
-                    hexsha_chunk,
-                    always=True,
-                    contains=True)
+            _status, out, err = self.repo.git.describe(
+                hexsha_chunk,
+                always=True,
+                contains=True,
+                with_extended_output=True)
+
+            if err:
+                # git describe might fail to find tags for commits
+                # if the hexsha is incorrect. In such cases, git
+                # runs successfully but outputs to stderr an error
+                # message such as the following:
+                #   "Could not get object for HEXSHA. Skipping.""
+                # Here, we match such lines from the stderr and remove
+                # the matching HEXSHAs from the hexsha_list
+                err_list = re.findall(
+                    r'Could not get object for ([0-9a-f]{10,40})',
+                    err, re.MULTILINE)
+                hexsha_list = [i for i in hexsha_list if i not in err_list]
+            gitout += "\n"+out
 
         # Verify the resulting list of tags has as many elements as the
         # hexsha_list: that for each commit we found the tag
-        tag_list = out.strip().splitlines()
+        tag_list = gitout.strip().splitlines()
         if tag_list and hexsha_list and (len(hexsha_list) != len(tag_list)):
             print("hexsha: %s != tag: %s" % (len(hexsha_list), len(tag_list)))
             sys.stderr.write(
