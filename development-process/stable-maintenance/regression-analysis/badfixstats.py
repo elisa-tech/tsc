@@ -50,9 +50,8 @@ class GitStatistics:
         self.inscopeset = set()
         self._build_inscopeset(inscopefile)
         # Map commit hash to tag name
-        # Key: commit hash, Value: list of tag names
-        self.tagmap = {}
-        self._build_tagmap()
+        # Key: commit hash, Value: tag name
+        self.tagmap = self._build_tagmap(rev=rev)
         # Map commit hash to list of names who signed-off the commit
         # Key: commit hash, Value: list of names
         self.signedoffmap = {}
@@ -69,7 +68,12 @@ class GitStatistics:
         for commit in list(self.repo.iter_commits(self.rev, reverse=True)):
             self._find_badfix(commit)
 
+        # Build the upstream tagmap now when the 'Commit_upstream_hexsha'
+        # is known for the commits we are interested of
+        upstream_hexshas = self.entries['Commit_upstream_hexsha']
+        self.upstreamtagmap = self._build_tagmap(hexsha_list=upstream_hexshas)
         self._find_upstream_tags()
+
         if self.indexfilename:
             print("[+] Finding merge commits, this might take several minutes "
                   "if the index is not up-to-date")
@@ -118,7 +122,8 @@ class GitStatistics:
         # one pair of (badfixsha,commit)
         if not stampmap:
             for line in commit.message.splitlines():
-                badfixsha, found_by, matched_by = self._check_line_badfix_summary(line)
+                badfixsha, found_by, matched_by = self._check_line_badfix_summary(
+                    line)
                 if matched_by:
                     matched_by_list.append(matched_by)
                 if badfixsha and badfixsha not in stampmap:
@@ -152,15 +157,18 @@ class GitStatistics:
                 print(text)
                 return
             badfix_timedelta = commit.committed_datetime - badfix_commit.committed_datetime
-            badfix_lifetime_days = int(round(badfix_timedelta / timedelta(days=1)))
+            badfix_lifetime_days = int(
+                round(badfix_timedelta / timedelta(days=1)))
             badfix_lifetime_days_decimal = badfix_timedelta / timedelta(days=1)
-            badfix_tag = self.tagmap.get(badfix_commit.hexsha, ["unknown"])[0]
+            badfix_tag = self.tagmap.get(badfix_commit.hexsha, "unknown")
             badfix_sha = badfix_commit.hexsha
             badfix_datetime = badfix_commit.committed_datetime
-            badfix_signer = ";".join(self.signedoffmap.get(badfix_commit.hexsha, [""]))
+            badfix_signer = ";".join(
+                self.signedoffmap.get(badfix_commit.hexsha, [""]))
 
         badfix_upstream_hexsha = self.mapcommittoupstream.get(badfix_sha, "")
-        commit_upstream_hexsha = self.mapcommittoupstream.get(commit.hexsha, "")
+        commit_upstream_hexsha = self.mapcommittoupstream.get(
+            commit.hexsha, "")
         badfix_upstream_commit = self._get_commit(badfix_upstream_hexsha)
         commit_upstream_commit = self._get_commit(commit_upstream_hexsha)
         if not badfix_upstream_commit or not commit_upstream_commit:
@@ -194,7 +202,7 @@ class GitStatistics:
         inscope = "1"
         if self.inscopeset:
             inscope = "1" if commit.hexsha[:12] in self.inscopeset else "0"
-        commit_tag = self.tagmap.get(commit.hexsha, ["unknown"])[0]
+        commit_tag = self.tagmap.get(commit.hexsha, "unknown")
         commit_signer = ";".join(self.signedoffmap.get(commit.hexsha, [""]))
         # Be aware that this is a rough estimation: not all commits
         # signed-off-by Sasha Levin are AUTOSEL patches
@@ -336,7 +344,8 @@ class GitStatistics:
         # Save the index to disk
         if self.indexfilename:
             with open(self.indexfilename, 'wb') as handle:
-                pickle.dump(self.index, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                pickle.dump(self.index, handle,
+                            protocol=pickle.HIGHEST_PROTOCOL)
                 fname = os.path.abspath(os.path.realpath(handle.name))
                 print("[+] Note: updated index to file: \"%s\"" % fname)
 
@@ -514,60 +523,6 @@ class GitStatistics:
             self._stamp_upstream_merge_commit(merge_commit)
 
     def _find_upstream_tags(self):
-        # Get unique Commit_upstream_hexsha entries
-        upstream_hexsha_set = set(self.entries['Commit_upstream_hexsha'])
-        # Remove empty if any
-        upstream_hexsha_set.discard("")
-        if len(upstream_hexsha_set) <= 0:
-            print("[+] Warning: no upstream references")
-            return
-
-        # Get the upstream commit tag by calling
-        # git describe --contains LIST_OF_HEXSHA
-        upstream_hexsha_list = list(upstream_hexsha_set)
-        status, out, err = self.repo.git.describe(
-            upstream_hexsha_list,
-            contains=True,
-            with_extended_output=True)
-        if status != 0:
-            print("[+] Warning: getting upstream tags failed")
-            return
-
-        if err:
-            # git describe might fail to find upstream tags for upstream
-            # commits if the Commit_upstream_hexsha is incorrect. For these
-            # cases, git runs successfully but outputs to stderr an error
-            # message such as the following:
-            #   "Could not get object for HEXSHA. Skipping.""
-            # Here, we match such lines from the stderr and remove the matching
-            # HEXSHAs from the upstream_hexsha_list
-            err_list = re.findall(
-                r'Could not get object for ([0-9a-f]{10,40})', err, re.MULTILINE)
-            # If no matches were found, stderr is due to a different error.
-            # Groan, then give up trying to find the upstream tags
-            if not err_list:
-                print(
-                    "[+] Warning: getting upstream tags returned unexpected "
-                    "stderr: %s" % err)
-                return
-            upstream_hexsha_list = [
-                i for i in upstream_hexsha_list if i not in err_list]
-
-        upstream_tag_list = out.splitlines()
-        if len(upstream_hexsha_list) != len(upstream_tag_list):
-            print(
-                "[+] Warning: number of upstream hexshas and tags does "
-                "not match")
-            return
-
-        # Build the upsteramtagmap
-        self.upstreamtagmap = {}
-        for tag, hexsha in zip(upstream_tag_list, upstream_hexsha_list):
-            # Ignore everything after (and including) the
-            # first '~' from the upstream tag,
-            # so e.g. 'v5.2-rc4~12^2~1^2~1^2~5' becomes 'v5.2-rc4'
-            self.upstreamtagmap[hexsha] = tag.split('~', 1)[0]
-
         # Add field "Commit_upstream_tag" to entries
         setcol = self.entries.setdefault
         for commit in self.entries['Commit_upstream_hexsha']:
@@ -646,47 +601,90 @@ class GitStatistics:
                 # Return first match (assume one hash per line)
                 match = re.search(r'[0-9a-f]{12}', line)
                 if not match:
-                    sys.stderr.write("Warning: inscope line missing hash: %s" % line)
+                    sys.stderr.write(
+                        "Warning: inscope line missing hash: %s" % line)
                     continue
                 commit = match.group()
                 self.inscopeset.add(commit)
 
-    def _build_tagmap(self):
-        RE_SHA_TAG = re.compile(
-            r'^(?P<sha>[0-9a-f]{40})\srefs/tags/(?P<tag>[^\^]+)')
-        try:
-            refs = self.repo.git.show_ref("--tags", "-d")
-        except git.GitCommandError:
-            text = \
-                "[+] Warning: unable to determine version information due to " \
-                "target repository missing tags"
-            print(text)
-            refs = ""
-        # The commits the tags directly point to
-        for line in refs.splitlines():
-            match = RE_SHA_TAG.match(line)
+    def _build_tagmap(self, rev=None, hexsha_list=[]):
+        # Select commits based on revision range rev if specified
+        if rev:
+            hexsha_list = [str(i) for i in self.repo.iter_commits(rev)]
+        # Otherwise, use the list of commits specified in hexsha_list
+        if len(hexsha_list) <= 0:
+            sys.stderr.write("Error: no commits in range: %s\n" % rev)
+            sys.exit(1)
+        # Remove non-unique elements preserving order
+        tempdict = OrderedDict.fromkeys(hexsha_list)
+        # Remove empty key if there is one
+        tempdict.pop('', None)
+        hexsha_list = list(tempdict)
+
+        # We need to split the list into smaller lists and process
+        # each sublist separately to not exceed the git argument
+        # list length limit
+        hexsha_list_chunks = _split_list(hexsha_list, 5000)
+        out = ''
+        # Get the tags by calling git describe --contains for the list of commits
+        for hexsha_chunk in hexsha_list_chunks:
+            out += "\n" + \
+                self.repo.git.describe(
+                    hexsha_chunk,
+                    always=True,
+                    contains=True)
+
+        # Verify the resulting list of tags has as many elements as the
+        # hexsha_list: that for each commit we found the tag
+        tag_list = out.strip().splitlines()
+        if tag_list and hexsha_list and (len(hexsha_list) != len(tag_list)):
+            print("hexsha: %s != tag: %s" % (len(hexsha_list), len(tag_list)))
+            sys.stderr.write(
+                "Error: number of hexshas and tags does not match\n")
+            sys.exit(1)
+
+        # Build the tagmap:
+        # Key: commit hexsha; Value: first tag that contains commit hexsha
+        tagmap = {}
+        pattern = re.compile(r'\b[0-9a-f]{10,40}\b')
+        match = None
+        for tag, hexsha in zip(tag_list, hexsha_list):
+            # We used option --always in git describe, which makes the git
+            # describe return commit hexsha if it fails to find the containing
+            # tag. Here, we check if the tag looks like a hexsha value.
+            # If it does, we assume it means the git describe --contains
+            # failed to find the tag for this commit, and will not include
+            # the value to the tagmap
+            match = pattern.match(tag)
             if match:
-                sha = match.group('sha')
-                tag = match.group('tag')
-                self.tagmap.setdefault(sha, []).append(tag)
-        # The commits "in between" the tags:
-        currtag = ["unknown"]
-        for commit in list(self.repo.iter_commits(self.rev)):
-            sha = commit.hexsha
-            tag = self.tagmap.get(sha, currtag)[0]
-            self.tagmap.setdefault(sha, []).append(tag)
-            currtag = [tag]
+                continue
+            # Ignore everything after (and including) the
+            # first '~' from the tag,
+            # so e.g. 'v5.2-rc4~12^2~1^2~1^2~5' becomes 'v5.2-rc4'
+            tag = tag.split('~', 1)[0]
+            # From the resulting string, ignore everything after (and including)
+            # the first '^'. This needs to be done, because annotated tags
+            # are prefixed with '^0',
+            # so e.g. 'v5.2^0' becomes 'v5.2'
+            tagmap[hexsha] = tag.split('^', 1)[0]
+        return tagmap
 
     def _build_signedoffmap(self):
-        RE_SIGNEDOFFBY = re.compile(r'^\s*[Ss]igned-off-by\s*[:;]\s*(?P<signer>.+)$')
+        RE_SIGNEDOFFBY = re.compile(
+            r'^\s*[Ss]igned-off-by\s*[:;]\s*(?P<signer>.+)$')
         for commit in list(self.repo.iter_commits(self.rev)):
             for line in commit.message.splitlines():
                 match = RE_SIGNEDOFFBY.match(line)
                 if match:
                     signer = match.group('signer')
-                    self.signedoffmap.setdefault(commit.hexsha, []).append(signer)
+                    self.signedoffmap.setdefault(
+                        commit.hexsha, []).append(signer)
+
 
 ################################################################################
+
+def _split_list(items, limit):
+    return [items[i:i + limit] for i in range(0, len(items), limit)]
 
 
 def getargs():
@@ -731,7 +729,8 @@ def getargs():
         "improve the script execution time, due to completely " \
         "disabling the relatively costly operation of finding the merge " \
         "commit information."
-    parser.add_argument('--no-merge-datapoints', help=help, action='store_true')
+    parser.add_argument('--no-merge-datapoints',
+                        help=help, action='store_true')
 
     help = \
         "file path to patchlist file, which contains commit hashes "\
