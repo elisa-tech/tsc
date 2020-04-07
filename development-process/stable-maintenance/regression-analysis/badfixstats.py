@@ -10,10 +10,15 @@ import argparse
 import os
 import sys
 import pickle
+from pathlib import Path
 
 import pandas as pd
 from collections import OrderedDict
 from datetime import datetime, timedelta
+
+################################################################################
+
+SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
 
 ################################################################################
 
@@ -59,8 +64,10 @@ class GitStatistics:
         # Map upstream commit hash to upstream tag name
         self.upstreamtagmap = {}
         # The name of the file that stores the index on the disk.
-        # "index" is dictionary that maps upstream_hexsha to merge commit
         self.indexfilename = None if nomerges else indexfile
+        # "index_on_disk" contains the (de-)serialized index data
+        self.index_on_disk = {}
+        # "index" is dictionary that maps upstream_hexsha to merge commit
         self.index = {}
         self._load_index()
 
@@ -72,7 +79,7 @@ class GitStatistics:
         # is known
         upstream_hexshas = self.entries['Commit_upstream_hexsha']
         self.upstreamtagmap = self._build_tagmap(hexsha_list=upstream_hexshas)
-        self._find_upstream_tags()
+        self._stamp_upstream_tags()
 
         if self.indexfilename:
             print("[+] Finding merge commits, this might take several minutes "
@@ -336,15 +343,25 @@ class GitStatistics:
         # upstream_hexsha to merge commit
         if self.indexfilename and os.path.isfile(self.indexfilename):
             with open(self.indexfilename, 'rb') as handle:
-                self.index = pickle.load(handle)
+                self.index_on_disk = pickle.load(handle)
+                self.index = self.index_on_disk.copy()
                 fname = os.path.abspath(os.path.realpath(handle.name))
                 print("[+] Note: using earlier index file: \"%s\"" % fname)
 
     def _save_index(self):
-        # Save the index to disk
+        # Save the index to disk, keeping the mappings required to later
+        # re-build the data we collected now, while also retaining the data
+        # that was originally available in the index
+        keys = \
+            self.entries['Commit_hexsha'] +\
+            self.entries['Commit_upstream_hexsha']
+        short_index = dict((k, self.index[k]) for k in keys if k in self.index)
+        # Merge dictionaries short_index and index_on_disk
+        self.index_on_disk.update(short_index)
+        # Serialize the merged dictionary using pickle
         if self.indexfilename:
             with open(self.indexfilename, 'wb') as handle:
-                pickle.dump(self.index, handle,
+                pickle.dump(self.index_on_disk, handle,
                             protocol=pickle.HIGHEST_PROTOCOL)
                 fname = os.path.abspath(os.path.realpath(handle.name))
                 print("[+] Note: updated index to file: \"%s\"" % fname)
@@ -416,6 +433,17 @@ class GitStatistics:
         setcol("Commit_latency_upstream_merge_stable_days_decimal", []).append(
             commit_latency_ums_days_decimal)
 
+    def _stamp_upstream_tags(self):
+        setcol = self.entries.setdefault
+        for commit in self.entries['Commit_upstream_hexsha']:
+            tag = self.upstreamtagmap.get(commit, "")
+            setcol('Commit_upstream_tag', []).append(tag)
+
+        setcol = self.entries.setdefault
+        for commit in self.entries['Badfix_upstream_hexsha']:
+            tag = self.upstreamtagmap.get(commit, "")
+            setcol('Badfix_upstream_tag', []).append(tag)
+
     def _add_final_columns(self):
         number_of_rows = len(self.entries['Commit_hexsha'])
 
@@ -424,7 +452,7 @@ class GitStatistics:
             badfix_merge_hexsha = ""
             if badfix_upstream_hexsha:
                 badfix_merge_hexsha = self.index.get(
-                    badfix_upstream_hexsha, [""])[0]
+                    badfix_upstream_hexsha, "")
             commit_upstream_merge_hexsha = self.entries[
                 'Commit_upstream_merge_hexsha'][i]
             self._stamp_badfix_upstream_merge_commit(
@@ -455,7 +483,7 @@ class GitStatistics:
 
             # Use the value from the index if it's already there
             if upstream_hexsha in self.index:
-                merge_commit = self.index[upstream_hexsha][0]
+                merge_commit = self.index[upstream_hexsha]
                 self._stamp_upstream_merge_commit(merge_commit)
                 continue
 
@@ -463,11 +491,11 @@ class GitStatistics:
             # https://stackoverflow.com/questions/8475448/
             ancestry_path_list = self.repo.git.rev_list(
                 "%s..%s" % (upstream_hexsha, upstream_tag),
-                ancestry_path=True).split()
+                ancestry_path=True, merges=True).split()
 
             first_parent_set = set(self.repo.git.rev_list(
                 "%s..%s" % (upstream_hexsha, upstream_tag),
-                first_parent=True).split())
+                first_parent=True, merges=True).split())
 
             for commit in reversed(ancestry_path_list):
                 if commit in first_parent_set:
@@ -475,29 +503,11 @@ class GitStatistics:
                     break
 
             if merge_commit:
-                merged_list = []
-                try:
-                    # What commits were merged with the suspected merge_commit?
-                    merged_list = self.repo.git.rev_list(
-                        "%s^1..%s^2" % (merge_commit, merge_commit)).split()
-                except git.GitCommandError as err:
-                    # If the git command throws an exception it's likely
-                    # due to the merge_commit not being a merge commit
-                    # after all. Here, we check the stderr for an expected
-                    # error message which would indicate the merge_commit was
-                    # not a merge commit
-                    expected_error = re.search(
-                        "ambiguous argument.*unknown revision", err.stderr)
+                # What commits were merged with the suspected merge_commit?
+                merged_list = self.repo.git.rev_list(
+                    "%s^1..%s^2" % (merge_commit, merge_commit)).split()
 
-                    # Groan if the error message was something other than what
-                    # we expected
-                    if not expected_error:
-                        print(" unecpected error message: %s" % err.stderr)
-                        print(" stdout: %s" % err.stdout)
-                        print(" command: %s" % err.command)
-
-                merged_set = set(merged_list)
-                if upstream_hexsha not in merged_set:
+                if upstream_hexsha not in set(merged_list):
                     # We end up here if upstrem_hexsha was a direct commit to
                     # the target branch, a fast forward merge, or some
                     # other corner case. For all these cases, we simply
@@ -513,27 +523,12 @@ class GitStatistics:
                 # Update the index
                 # Store all the commits merged with merge_commit into an index:
                 # Key: upstream_hexsha
-                # Value: list of merge commits
+                # Value: merge commit
                 for commit in merged_list:
-                    merge_list = self.index.setdefault(commit, [])
-                    if merge_commit not in merge_list:
-                        merge_list.append(merge_commit)
+                    self.index[commit] = merge_commit
 
             # "stamp" the merge_commit (or empty value if it wasn't found)
             self._stamp_upstream_merge_commit(merge_commit)
-
-    def _find_upstream_tags(self):
-        # Add field "Commit_upstream_tag" to entries
-        setcol = self.entries.setdefault
-        for commit in self.entries['Commit_upstream_hexsha']:
-            tag = self.upstreamtagmap.get(commit, "")
-            setcol('Commit_upstream_tag', []).append(tag)
-
-        # Add field "Badfix_upstream_tag" to entries
-        setcol = self.entries.setdefault
-        for commit in self.entries['Badfix_upstream_hexsha']:
-            tag = self.upstreamtagmap.get(commit, "")
-            setcol('Badfix_upstream_tag', []).append(tag)
 
     def _build_commitset(self):
         try:
@@ -564,7 +559,8 @@ class GitStatistics:
             r'(?<!reverts commit [0-9a-f]{40} which was)'   # (4)
             r'(?<!reverts commit [0-9a-f]{40}, which was)'  # (5)
             r'$'
-            r'\s*\[?\s*[Cc]omm?[it]{2}\s*(?P<sha>[0-9a-f]{10,40})\s+[Uu]pst?ream\.?\s*\]?\s*$',  # (1)
+            # (1)
+            r'\s*\[?\s*[Cc]omm?[it]{2}\s*(?P<sha>[0-9a-f]{10,40})\s+[Uu]pst?ream\.?\s*\]?\s*$',
             re.MULTILINE)
         RE_UPSTREAM_2 = re.compile(
             r'(?<!reverts commit [0-9a-f]{40} which is)'    # (2)
@@ -572,7 +568,8 @@ class GitStatistics:
             r'(?<!reverts commit [0-9a-f]{40} which was)'   # (4)
             r'(?<!reverts commit [0-9a-f]{40}, which was)'  # (5)
             r'$'
-            r'^\s*\[?\s*[Uu]pst?ream\s+[Cc]omm?[it]{2}\s*(?P<sha>[0-9a-f]{40})',  # (1)
+            # (1)
+            r'^\s*\[?\s*[Uu]pst?ream\s+[Cc]omm?[it]{2}\s*(?P<sha>[0-9a-f]{40})',
             re.MULTILINE)
         for commit in list(self.repo.iter_commits(self.rev)):
             match = ""
@@ -622,9 +619,9 @@ class GitStatistics:
         hexsha_list = list(tempdict)
 
         # We need to split the list into smaller lists and process
-        # each sublist separately to not exceed the git argument
-        # list length limit
-        hexsha_list_chunks = _split_list(hexsha_list, 5000)
+        # each sublist separately to not exceed the argument list
+        # length limit
+        hexsha_list_chunks = _split_list(hexsha_list, 10000)
         gitout = ''
         # Get the tags by calling git describe --contains for the list of commits
         for hexsha_chunk in hexsha_list_chunks:
@@ -724,8 +721,9 @@ def getargs():
     parser.add_argument('--out', nargs='?', help=help, default='badfixes.csv')
 
     help = \
-        "set the index file name, default is 'index.pickle' "\
-        "(\"index\" is a dictionary that maps upstream_hexsha to merge "\
+        "set the index file name, default is 'index.pickle' in the "\
+        "directory containing the script "\
+        "(\"index\" is a dictionary that maps hexsha to merge "\
         "commit; the script serializes/de-serializes the dictionary "\
         "in an attempt to avoid the relatively costly operation "\
         "of finding the merge "\
@@ -734,8 +732,9 @@ def getargs():
         "it doesn't exist. Otherwise, the script updates the given "\
         "index file appending "\
         "any new merge commit mappings to the specified file."
+    index_pickle = SCRIPT_DIR / "index.pickle"
     parser.add_argument(
-        '--index-file', nargs='?', help=help, default='index.pickle')
+        '--index-file', nargs='?', help=help, default=index_pickle)
 
     help = \
         "setting this flag changes the output csv so that merge-related " \

@@ -15,6 +15,7 @@ import re
 from pathlib import Path
 import shutil
 import pandas as pd
+import hashlib
 
 TESTS_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
 TEST_DATA_DIR = TESTS_DIR / "testdata"
@@ -115,6 +116,47 @@ def test_badfixstats_no_merge_datapoints(set_up_test_data):
     df = df[['Badfix_hexsha']].drop_duplicates()
     df = df[df['Badfix_hexsha'].notnull()]
     assert df.shape[0] == 3
+
+
+def sha256sum(filename):
+    with open(filename, "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()
+
+
+def test_badfixstats_index_constancy(set_up_test_data):
+    """
+    Test badfixstats.py index-file does not update unless new commits emerge
+    """
+    outfile = TEST_DATA_DIR / "badfixstats_out.csv"
+    gitdir = TEST_DATA_DIR / "stable_4.19.2"
+    indexfile = TEST_DATA_DIR / "index.pickle"
+
+    # Run badfixstats the first time
+    cmd = [BADFIXSTATS,
+           "--git-dir", gitdir,
+           "--out", outfile,
+           "--index-file", indexfile,
+           "v4.19^..v4.19.1"]
+    print(cmd)
+    assert subprocess.run(cmd).returncode == 0
+    assert indexfile.exists()
+    hex1 = sha256sum(indexfile)
+    assert hex1 != ""
+
+    # Run it the second time with the same rev specifier
+    cmd = [BADFIXSTATS,
+           "--git-dir", gitdir,
+           "--out", outfile,
+           "--index-file", indexfile,
+           "v4.19^..v4.19.1"]
+    print(cmd)
+    assert subprocess.run(cmd).returncode == 0
+    assert indexfile.exists()
+    hex2 = sha256sum(indexfile)
+    assert hex2 != ""
+
+    # index.pickle content should not have changed between the two runs
+    assert hex1 == hex2
 
 
 if __name__ == '__main__':
