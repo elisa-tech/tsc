@@ -88,6 +88,8 @@ def getargs():
         "The script can be used to reduce the patches in the range REV to "\
         "those that are relevant for the kernel configuration that was used "\
         "in building the vmlinux and the modules. "\
+        "The script expects DWARF debug sections (CONFIG_DEBUG_INFO=y) "\
+        "in the object files. "\
         "Note: the script produces a list of files that were used to "\
         "compile the _current_ version of vmlinux and modules found under "\
         "the LINUX_DIR. "\
@@ -158,11 +160,9 @@ if __name__ == '__main__':
     with open(objdumpfile, 'a') as outfile:
         cmd = 'objdump -Wl %s' % vmlinux
         exec_cmd(cmd, stdout=outfile)
-    print("[+] Wrote: %s" % objdumpfile)
 
     # Parse objdump
     with open(objdumpfile, 'r') as infile, open(filelistfile, 'w') as outfile:
-        print("[+] Wrote: %s" % filelistfile)
         if not parse_objdump(infile, outfile, linux_dir):
             sys.stderr.write(
                 "Error: parsing objdump failed\n"
@@ -175,9 +175,16 @@ if __name__ == '__main__':
     # Generate patchlist
     with open(filelistfile, 'r') as infile, open(patchlistfile, 'w') as outfile:
         cmd = \
-            'git --git-dir=%s log --oneline '\
+            'git --git-dir=%s log --format=format:%%H '\
             '--no-merges %s -- `cat %s`' % (repo, rev, filelistfile)
         exec_cmd(cmd, stdout=outfile)
+
+    print("[+] Wrote: %s" % filelistfile)
+    # os.remove(filelistfile)
+
+    # Remove the intermediate files
+    os.remove(objdumpfile)
+
     print("[+] Wrote: %s" % patchlistfile)
 
 ###############################################################################

@@ -25,7 +25,7 @@ SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
 
 class GitStatistics:
 
-    def __init__(self, gitdir, rev, indexfile, nomerges, inscopefile=""):
+    def __init__(self, gitdir, rev, indexfile, nomerges):
         self.gitdir = gitdir
         # Statistics are generated based on the git commit entries in the
         # specified git repository that match the given revision (range)
@@ -35,7 +35,7 @@ class GitStatistics:
         self.entries = {}
         # GitPython Repo object
         self.repo = git.Repo(self.gitdir)
-        # Set of commit hashes in self.repo between [beg,end]
+        # Set of commit hashes in self.repo in range rev
         # Key: commit sha
         self.commitset = set()
         self._build_commitset()
@@ -50,10 +50,6 @@ class GitStatistics:
         # Key: commit in the selected branch, Value: upstream commit sha
         self.mapcommittoupstream = {}
         self._build_upstreamindexes()
-        # Set of commits that should be considered "in-scope"
-        # Key: 12-digit commit sha
-        self.inscopeset = set()
-        self._build_inscopeset(inscopefile)
         # Map commit hash to tag name
         # Key: commit hash, Value: tag name
         self.tagmap = self._build_tagmap(rev=rev)
@@ -206,9 +202,6 @@ class GitStatistics:
             commit_latency_us_days = \
                 int(round(commit_latency_us_timedelta / timedelta(days=1)))
 
-        inscope = "1"
-        if self.inscopeset:
-            inscope = "1" if commit.hexsha[:12] in self.inscopeset else "0"
         commit_tag = self.tagmap.get(commit.hexsha, "unknown")
         commit_signer = ";".join(self.signedoffmap.get(commit.hexsha, [""]))
         # Be aware that this is a rough estimation: not all commits
@@ -244,7 +237,6 @@ class GitStatistics:
         setcol('Badfix_upstream_datetime', []).append(badfix_upstream_datetime)
 
         setcol('Found_by', []).append(found_by)
-        setcol('In_scope', []).append(inscope)
         setcol('Matched_by', []).append(";".join(matched_by_list))
 
     def _check_line_badfix_sha(self, line):
@@ -590,20 +582,6 @@ class GitStatistics:
                     upstreamsha, []).append(sha)
                 self.mapcommittoupstream[sha] = upstreamsha
 
-    def _build_inscopeset(self, inscopefile):
-        if not inscopefile:
-            return
-        with open(inscopefile) as inscopef:
-            for line in inscopef:
-                # Return first match (assume one hash per line)
-                match = re.search(r'[0-9a-f]{12}', line)
-                if not match:
-                    sys.stderr.write(
-                        "Warning: inscope line missing hash: %s" % line)
-                    continue
-                commit = match.group()
-                self.inscopeset.add(commit)
-
     def _build_tagmap(self, rev=None, hexsha_list=[]):
         # Select commits based on revision range rev if specified
         if rev:
@@ -745,11 +723,6 @@ def getargs():
     parser.add_argument('--no-merge-datapoints',
                         help=help, action='store_true')
 
-    help = \
-        "file path to patchlist file, which contains commit hashes "\
-        "(one per line) that should be considered in-scope. If omitted, "\
-        "all commits are considered in-scope."
-    parser.add_argument("--inscope", nargs='?', help=help)
     return parser.parse_args()
 
 ################################################################################
@@ -765,7 +738,6 @@ if __name__ == "__main__":
     repo = args.git_dir
     outfile = args.out
     indexfile = args.index_file
-    inscopefile = args.inscope
     nomerges = args.no_merge_datapoints
 
     repo = repo if repo.endswith(".git") else os.path.join(repo, ".git")
@@ -774,7 +746,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     print("[+] Reading commit history, this might take a few minutes")
-    stats = GitStatistics(repo, rev, indexfile, nomerges, inscopefile)
+    stats = GitStatistics(repo, rev, indexfile, nomerges)
     stats.find_badfixes()
 
     stats.to_csv(outfile)

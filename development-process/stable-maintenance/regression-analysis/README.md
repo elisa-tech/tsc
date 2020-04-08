@@ -14,8 +14,9 @@ This repository is a collection of scripts for Linux Stable Kernel regression an
 * [Visualizing Regressions](#visualizing-regressions)
 * [Merging Commits Between Branches](#merging-commits-between-branches)
 * [Filtering Based on Kernel Configuration](#filtering-based-on-kernel-configuration)
-* [Filtering Based on Contents of Specific Fields](#filtering-based-on-contents-of-specific-fields)
+* [Filtering Using SQL Queries](#filtering-using-sql-queries)
 * [Updating Regression Database for a Set of Releases](#updating-regression-database-for-a-set-of-releases)
+* [Contribute](#contribute)
 
 ## Getting Started
 Scripts require python3, git, and binutils (objdump):
@@ -43,11 +44,11 @@ $ ./badfixstats.py --git-dir ~/linux-stable --out linux-stable_v4.19-v4.19.74.cs
 Output is a CSV database that lists all commits in the specified revision range in chronological order by commit time. For each commit, the CSV database includes fields such as: Commit_datetime, Commit_hexsha, and Commit_tag that specify the commit time, hexsha, and tag respectively. Fields such as Badfix_hexsha, Badfix_datetime, and Badfix_tag refer to regression (or badfix) that was fixed by the commit specified in Commit_hexsha field on the same row. That is, if Badfix_hexsha is not empty, it refers to regression commit that was fixed by Commit_hexsha. Otherwise, the associated Commit_hexsha is not a fix to an earlier regression. In general all fields with prefix "Badfix_" refer to the regression, whereas, all fields with prefix "Commit_" refer to a potential fix.
 
 ## Visualizing Regressions
-[badfixplot.py](badfixplot.py) takes the CSV database output by [badfixstats.py](badfixstats.py) and visualizes the regressions in interactive html charts:
+[badfixplot.py](badfixplot.py) takes the CSV database output by [badfixstats.py](badfixstats.py) and visualizes the commits and regressions in interactive html charts:
 ```
 $ ./badfixplot.py linux-stable_v4.19-v4.19.74.csv
 ```
-Output is a set of html files that visualize the regressions.
+Output is a set of html files that visualize the commits and regressions from the specified database.
 
 ## Merging Commits Between Branches
 [badfixcommon.py](badfixcommon.py) generates output that describes the overlap between two branches given two CSV database files as input. Script determines the overlaps based on upstream references on each line in the input CSV files.
@@ -73,39 +74,51 @@ Each row in the "common" CSV output refers to a common commit in both branches. 
 To visualize the regressions in the merged branch, the resulting merged.csv can be given as an input to [badfixplot.py](badfixplot.py). Moreover, to merge more than two pairs of branches, the resulting merged.csv can be combined with another branch by specifying the merged.csv as an input to the [badfixcommon.py](badfixcommon.py).
 
 ## Filtering Based on Kernel Configuration
-[patchfilter-tool.py](patchfilter-tool.py) makes it possible to filter a set of patches to those that are relevant for a specific kernel configuration. That is, if a patch modifies source files not used in the kernel build, the patch can be labelled as not relevant for the specific kernel configuration. Based on this information, we can filter the regression database to include only those regressions that are relevant for the specific kernel configuration. Notice the patchfilter-tool.py produces an estimate of the filtered scope. There might be minor errors in the estimation, depending on how much the kernel tree changed between the specified revision range.
+[patchfilter-tool.py](patchfilter-tool.py) makes it possible to filter a set of patches to those that are relevant for a specific kernel configuration. That is, if a patch modifies source files not used in the kernel build, the patch can be labelled as not relevant for the specific kernel configuration. Based on this information, we can filter the regression database to include only those regressions that are relevant for the specific kernel configuration. Notice the patchfilter-tool.py produces an estimate of the filtered scope. There might be errors in the estimation, depending on how much the kernel tree changed between the specified revision range.
 
-To filter the regression database based on the kernel configuration, first build the kernel tree using the kernel configuration of interest. Then, run the [patchfilter-tool.py](patchfilter-tool.py) specifying the kernel build tree and the git revision range:
+To filter the regression database based on the kernel configuration, first build the kernel tree using the kernel configuration of interest. Notice the [patchfilter-tool.py](patchfilter-tool.py) requires DWARF debug sections, so make sure the kernel was built with CONFIG_DEBUG_INFO=y. Then, run the [patchfilter-tool.py](patchfilter-tool.py) specifying the kernel build tree and the git revision range:
 ```
 $ ./patchfilter-tool.py --linux-dir ~/linux-stable/ v4.19..v4.19.74
 [+] Reading objects from: ~/linux-stable/
-[+] Wrote: objdump.txt
 [+] Wrote: filelist.txt
 [+] Wrote: patchlist.txt
 ```
-We can then generate the regression database using [badfixstats.py](badfixstats.py) by specifying the generated patchlist.txt as --inscope argument:
+To filter the [badfixstats.py](badfixstats.py) generated CSV output based on the [patchfilter-tool.py](patchfilter-tool.py) generated patchlist.txt, use the [badfixfilter.py](badfixfilter.py) specifying the patchlist.txt as --filter argument:
 ```
-$ ./badfixstats.py --inscope patchlist.txt --git-dir ~/linux-stable --out linux-stable_v4.19-v4.19.74.csv v4.19^..v4.19.74
+$ ./badfixfilter.py --db linux-stable_v4.19-v4.19.74.csv --col Commit_hexsha --filter patchlist.txt
 ```
-In the generated CSV output, the field "In_scope" now indicates if the patch is relevant for the specific kernel configuration or not.
+The generated CSV output includes only the patches relevant for the specific kernel configuration. To visualize the filtered data, the resulting output can be given as an input to [badfixplot.py](badfixplot.py).
 
-## Filtering Based on Contents of Specific Fields
-To filter the [badfixstats.py](badfixstats.py) generated CSV output based on the contents of specific fields, we recommend installing csvquery (or similar) for running SQL queries on CSV files:
+## Filtering Using SQL Queries
+For more complex filtering and queries to the [badfixstats.py](badfixstats.py) generated CSV output, we recommend installing csvquery (or similar) for running SQL queries on CSV files:
 ```
 $ pip install --user csvquerytool
 
 # Ensure the install directory is in the $PATH
 $ export PATH=$PATH:'~/.local/bin'
 ```
-As an example, the below command shows how to filter the data based on "Signed-off-by" tag assuming the input database linux-stable_v4.19-v4.19.74.csv has been created earlier with [badfixstats.py](badfixstats.py):
+As an example, the below command shows how to generate a list of subsystem trees - ordered by the number of patches - from which the stable commits originated from:
 ```
-$ csvquery -q 'select * from csv where Commit_signedby like "%Greg Kroah-Hartman%" or Badfix_signedby like "%Greg Kroah-Hartman%"' linux-stable_v4.19-v4.19.74.csv
+$ csvquery -q \
+"select distinct Commit_upstream_merge_tree, Commit_hexsha from csv where commit_upstream_hexsha != ''" linux-stable_v4.19-v4.19.74.csv \
+> temp.csv && \
+csvquery -q \
+"select Commit_upstream_merge_tree, count(*) as count from csv group by Commit_upstream_merge_tree order by count desc" temp.csv | \
+column -t -s,
+
+Commit_upstream_merge_tree                                                count
+git://git.kernel.org/pub/scm/linux/kernel/git/davem/net                   1179
+git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip                     537
+git://anongit.freedesktop.org/drm/drm                                     390
+git://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next              336
+git://git.kernel.org/pub/scm/linux/kernel/git/tiwai/sound                 286
+(patches from Andrew)                                                     256
+git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb                  231
+git://git.kernel.dk/linux-block                                           215
+git://git.kernel.org/pub/scm/linux/kernel/git/jejb/scsi                   174
+git://git.kernel.org/pub/scm/linux/kernel/git/mchehab/linux-media         152
+...
 ```
-Similarly, the example below shows how to filter the data based on "In_scope" field:
-```
-$ csvquery -q 'select * from csv where In_scope == 1' linux-stable_v4.19-v4.19.74.csv
-```
-To visualize the filtered data, the resulting output can be redirected to a file which then can be given as an input to [badfixplot.py](badfixplot.py).
 
 ## Updating Regression Database for a Set of Releases
 [update.py](update.py) is a simple front-end to badfixstats.py and badfixplot.py that makes it easier to update and maintain regression databases and visualizations for a set of LTS releases. Given a linux-stable git repository, update.py calls badfixstats.py and badfixplot.py to generate and visualize regression database for specific LTS branches and also generates a markdown page that summarizes the collected data.
