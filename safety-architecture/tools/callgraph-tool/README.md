@@ -13,7 +13,7 @@ Call Graph is tool for studying call graphs between different function calling p
 
 ## Prerequisites
 ```
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 ```
 In order to be able to generate the call graph database, it is required to install llvm tools
 ```
