@@ -19,7 +19,7 @@ install-requirements:  ## Install all requirements
 	pip3 install --upgrade pytest
 	$(call target_success,$@)
 
-pre-push: test style clean reuse-lint ## Run tests, pycodestyle, and reuse-lint
+pre-push: test style clean ## Run tests, pycodestyle
 	$(call target_success,$@)
 
 test: ## Run tests
