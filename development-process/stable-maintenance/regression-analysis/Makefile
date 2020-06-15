@@ -17,6 +17,7 @@ help: ## Show this help message
 install-requirements:  ## Install all requirements
 	pip3 install -r requirements.txt --no-cache-dir
 	pip3 install -r requirements-dev.txt --no-cache-dir
+	pip3 install --upgrade pytest
 	$(call target_success,$@)
 
 pre-push: test style clean ## Run tests, pycodestyle, and reuse-lint
