@@ -22,6 +22,7 @@ pre-push: test style clean ## Run tests, pycodestyle, and clean
 	$(call target_success,$@)
 
 test: ## Run tests
+	unzip min_clang_test.zip -d ./
 	./tests/resources/generate_compile_commands.sh
 	cd ./tests/resources && ./generate_expected_output.sh
 	pytest -vx tests/
@@ -46,6 +47,7 @@ clean-test: ## Remove test and coverage artifacts
 	rm -fr .pytest_cache/
 	rm -fr tests/resources/*.json
 	rm -fr tests/resources/*.csv
+	rm -fr ./clang/
 
 clean-pyc: ## Remove Python artifacts
 	find . -name '*.pyc' -exec rm -f {} +

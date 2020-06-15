@@ -40,6 +40,7 @@ matrix:
         - make install-requirements
       script:
         - make pre-push
+        - make clang-indexer
 
     # Sub-dir safety-architecture/tools/callgraph-tool
     # Python version: 3.7
@@ -52,3 +53,4 @@ matrix:
         - make install-requirements
       script:
         - make pre-push
+        - make clang-indexer
