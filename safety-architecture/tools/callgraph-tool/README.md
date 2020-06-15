@@ -166,6 +166,13 @@ callgraph-tool.py -c  --multi_path find_extend_vma
 Only one instance of server is allowed on the system at the same time.
 
 
+## Settings file
+For reproducibility purposes, it can be more convenient to use settings file than command line arguments. This way the environment setup can be more easily and realiably shared between the developers/users. Callgraph tool supports using the settings file in JSON format to achieve this. 
+```
+callgraph-tool.py -f settings.json
+```
+
+See [documentation](doc/settings.md) for more information.
 
 ## License
 This project is licensed under the Apache license, version 2.0 - see the Apache-2.0.txt file for details.
