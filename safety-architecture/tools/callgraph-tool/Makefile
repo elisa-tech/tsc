@@ -22,6 +22,10 @@ install-requirements:  ## Install all requirements
 pre-push: test style clean ## Run tests, pycodestyle
 	$(call target_success,$@)
 
+clang-indexer:
+	make -C clang_indexer pre-push
+	$(call target_success,$@)
+
 test: ## Run tests
 	pytest tests/
 	$(call target_success,$@)
