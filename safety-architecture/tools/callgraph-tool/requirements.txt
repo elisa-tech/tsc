@@ -15,4 +15,5 @@ wget
 pycodestyle
 pytest
 pytest-cov
+reuse
 IPython
