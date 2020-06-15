@@ -31,7 +31,7 @@ matrix:
 
     # Sub-dir safety-architecture/tools/callgraph-tool
     # Python version: 3.6
-    - os: linux
+    - language: python
       dist: trusty
       addons:
           apt:
