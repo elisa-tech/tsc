@@ -15,7 +15,7 @@ import sys
 callgraphtool_path = os.path.dirname(os.path.abspath(__file__)) + '/../../'
 sys.path.append(callgraphtool_path)
 
-from db import GraphDb
+from db import GraphDb  # noqa E402
 
 """
 _LIN_DIRS = [
