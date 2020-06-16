@@ -4,13 +4,15 @@
 
 import json
 import logging
+import multiprocessing
 import os
 import re
+import sys
 import tempfile
 
+from cgutils import read_configuration_file
 from enum import Enum
-from llvm_parse import parse_llvm
-
+from llvm_parse import parse_llvm, Function
 
 DEF_LLVM_EXT = '.ll'
 LLVM_EXT = ['.ll', '.llvm']
@@ -24,15 +26,102 @@ class BuildLogFormat(Enum):
     KERNEL_C = 'kernel_c'
     KERNEL_CLANG = 'kernel_clang'
     LL_CLANG = 'll_clang'
+    AST_CLANG = 'ast_clang'
     CPLUSPLUS = 'c++'
+
+
+def build_indirect_nodes(config, call_graph):
+    indirect_nodes = []
+
+    if 'Indirect' in config:
+        for operation, callees in config['Indirect'].items():
+            caller = Function(operation, indirect=True)
+            if caller not in call_graph:
+                call_graph[caller] = []
+                indirect_nodes.append(operation)
+
+    return indirect_nodes
+
+
+def get_missing_nodes(config, call_graph, dso_declare):
+    # only add the indirect edges for nodes that were found in the source
+    if 'Indirect' in config:
+        for operation, callees in config['Indirect'].items():
+            caller = Function(operation, indirect=True)
+            for callee in callees:
+                callee = Function(callee)
+                if callee in call_graph:
+                    call_graph[caller].append(callee)
+
+    for func in dso_declare:
+        if func not in call_graph:
+            call_graph[func] = []
+
+    missing_nodes = []
+    for node_out in call_graph:
+        for node_in in call_graph[node_out]:
+            if node_in not in call_graph.keys() and node_in not in missing_nodes:
+                logging.info("Missing node: %s found in the edge from %s" % (node_in.name, node_out.name))
+                missing_nodes.append(node_in)
+    print("Missing %s nodes found in edges" % len(missing_nodes))
+    nodes = [Function(node.name, args=node.args) for node in missing_nodes]
+    return nodes
+
+
+def clang_indexer_build(args, call_graph):
+    CLANG_INDEXER_PATH = os.path.dirname(os.path.abspath(__file__)) + '/clang_indexer/'
+    sys.path.append(CLANG_INDEXER_PATH)
+
+    import utils
+    from clang_find_calls import find_function_calls
+    from convert_db import calls_to_db
+
+    cg_parser = utils.setup_callgraph_parser(args.build[0], args.build_exclude)
+    find_function_calls(cg_parser)
+    calls_file = cg_parser.parse_args().out
+    calls_to_db(calls_file, call_graph)
+
+
+def build_call_graph(args, call_graph):
+    args.build[0] = convert_build_file(args.build[0], args.build_log_format)
+
+    if args.build_log_format == BuildLogFormat.AST_CLANG:
+        clang_indexer_build(args, call_graph)
+        return
+
+    config = read_configuration_file(args.config)
+    indirect_nodes = build_indirect_nodes(config, call_graph)
+
+    manager = multiprocessing.Manager()
+    call_graph_lock = manager.Lock()
+    tmp_call_graph = manager.dict()
+    tmp_dso_declare = manager.list()
+
+    print("Proceed to LLVM parse")
+
+    with open(args.build[0], "r") as ins:
+        try:
+            pool = multiprocessing.Pool(multiprocessing.cpu_count())
+            engine = Engine(indirect_nodes, call_graph_lock, tmp_call_graph, tmp_dso_declare, args)
+            pool.map(engine, ins)
+        finally:  # To make sure processes are closed in the end, even if errors happen
+            pool.close()
+            pool.join()
+
+    call_graph.update(tmp_call_graph)
+    dso_declare = set(tmp_dso_declare)
+    missing_nodes = get_missing_nodes(config, call_graph, dso_declare)
+    for node in missing_nodes:
+        call_graph[node] = []
 
 
 def convert(build_log, build_log_format, temp_file):
 
     if BuildLogFormat.KERNEL_C == build_log_format or \
        BuildLogFormat.KERNEL_CLANG == build_log_format or \
-       BuildLogFormat.CPLUSPLUS == build_log_format:
-        print("plain log")
+       BuildLogFormat.CPLUSPLUS == build_log_format or \
+       BuildLogFormat.AST_CLANG == build_log_format:
+        logging.info("plain log")
         return False, "."
 
     raise ValueError("Not implemented log format: " + str(build_log_format))
@@ -58,7 +147,8 @@ def get_unsupported_arguments_x86():
                              '-mindirect-branch=thunk-extern', '-mindirect-branch=thunk-inline',
                              '-mindirect-branch-register',
                              '-fno-canonical-system-headers', '-Wunused-but-set-parameter',
-                             '-Wno-free-nonheap-object']
+                             '-Wno-free-nonheap-object', '-fasan-shadow-offset=0xdffffc0000000000',
+                             '-fno-conserve-stack']
     return unsupported_arguments
 
 
@@ -101,9 +191,9 @@ class ClangCommand(object):
 
     def _turn_of_optimizations(self):
         # turn off function inlining
-        self.command = self.command.replace('-O1', '-O0')
-        self.command = self.command.replace('-O2', '-O0')
-        self.command = self.command.replace('-O3', '-O0')
+        optim_flags = ['-O1', '-O2', '-O3', '-Ofast', '-Os', '-Oz', '-Og', '-O', '-O4']
+        for of in optim_flags:
+            self.command = self.command.replace(of, '')
 
     def _remove_unsupported_args(self):
         unsupported_arguments = get_unsupported_arguments_x86()
@@ -206,7 +296,7 @@ class ClangCpp(ClangCommand):
 
 class Engine(object):
 
-    def __init__(self, indirect_nodes, call_graph_lock, call_graph, args):
+    def __init__(self, indirect_nodes, call_graph_lock, call_graph, declare_dso, args):
         self.indirect_nodes = indirect_nodes
         self.fast_build = args.fast_build
         self.call_graph_lock = call_graph_lock
@@ -214,6 +304,7 @@ class Engine(object):
         self.build_exclude = [exclude.strip() for exclude in args.build_exclude.split(',')]
         self.arch = args.arch
         self.clang_path = args.clang
+        self.declare_dso = declare_dso
         self._select_command_type(args)
 
     def _select_command_type(self, args):
@@ -233,11 +324,10 @@ class Engine(object):
         return self.build_llvms(cc_command)
 
     def build_llvms(self, cc_command):
-
         clang_command = self.Command(cc_command, self.arch, self.clang_path)
         if not clang_command.valid:
             return
-        logging.info("Compile command: " + cc_command)
+        logging.debug("Compile command: " + cc_command)
         # Ignore files/directories listed in build_exclude
         if clang_command.exclude_from_build(self.build_exclude):
             return
@@ -248,6 +338,6 @@ class Engine(object):
 
         if success:
             with open(translation_unit, 'r') as stream:
-                parse_llvm(stream, self.call_graph, self.call_graph_lock, self.indirect_nodes)
+                parse_llvm(stream, self.call_graph, self.call_graph_lock, self.indirect_nodes, self.declare_dso)
 
-        logging.info("Clang command" + str(clang_command))
+        logging.debug("Clang command: " + str(clang_command))

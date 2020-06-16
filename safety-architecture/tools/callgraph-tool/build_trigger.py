@@ -4,6 +4,7 @@
 
 import cgutils as cgu
 import multiprocessing
+import logging
 
 from collections import OrderedDict
 from llvm_parse import Function
@@ -20,7 +21,7 @@ class TriggerEngine(object):
 
     def __call__(self, args):
         trigger, entry_point = args
-        print('Prepare map for ' + trigger)
+        logging.info('Prepare map for ' + trigger)
 
         if isinstance(entry_point, list):
             for point in entry_point:
