@@ -38,6 +38,7 @@ Callgraph tool support various build options which can be selected with --build_
 * kernel\_c
 * kernel\_clang
 * ll\_clang
+* ast\_clang
 
 Default option is _kernel\_c_. The instructions in this document assume the default option. For more details about other options see the detailed [documentation](doc/buildlogoptions.md) for build log options.
 

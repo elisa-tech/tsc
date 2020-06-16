@@ -69,7 +69,7 @@ def get_missing_nodes(config, call_graph, dso_declare):
 
 
 def clang_indexer_build(args, call_graph):
-    CLANG_INDEXER_PATH = os.path.dirname(os.path.abspath(__file__)) + '/clang-indexer/'
+    CLANG_INDEXER_PATH = os.path.dirname(os.path.abspath(__file__)) + '/clang_indexer/'
     sys.path.append(CLANG_INDEXER_PATH)
 
     import utils

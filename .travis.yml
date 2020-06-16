@@ -39,11 +39,10 @@ matrix:
                   - ubuntu-toolchain-r-test
               packages:
                   - libstdc++6
+                  - bear
       python:
         - "3.6"
       before_install:
-        - sudo apt-get update
-        - sudo apt-get install -y bear
         - cd safety-architecture/tools/callgraph-tool
       install:
         - make install-requirements
