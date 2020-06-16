@@ -31,7 +31,7 @@ test: ## Run tests
 	$(call target_success,$@)
 
 style: ## Check with pycodestyle
-	pycodestyle --max-line-length 120 --exclude='venv/' .
+	pycodestyle --max-line-length 120 --exclude='venv/,clang_indexer/clang/' .
 	$(call target_success,$@)
 
 reuse-lint: ## Check with reuse lint
