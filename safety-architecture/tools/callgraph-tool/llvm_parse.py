@@ -2,9 +2,13 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+import logging
 import re
 import itertools
 import logging
+import os
+
+from cg_indirect import detect_ops_structures, get_indirect
 
 
 class Function:
@@ -45,51 +49,16 @@ class Function:
             self.source_file == other.source_file and \
             self.line_numbers == other.line_numbers
 
-
-def find_ops_structures(llvm_file, indirect_func_names):
-    structs_and_member_names = {}  # contains only subset of those that match structs_and_member_indices
-    structs_and_member_indices = {}
-    if indirect_func_names is None:
-        return structs_and_member_indices, structs_and_member_names
-
-    re_structure_type = re.compile(
-        r'DW_TAG_structure_type, name: "(?P<struct>\w+)".*elements: !(?P<elements_label>\d+)')
-    re_elements = re.compile(r'!(?P<label>\d+) = !{(?P<elements>.*)}')
-    re_member = re.compile(r'!(?P<label>\d+) = .*DW_TAG_member, name: "(?P<member>\w+)"')
-
-    for operation in indirect_func_names:
-        struct_name, op_name = operation.split('.')
-        elements_label = None
-        elements = None
-
-        llvm_file.seek(0)
-
-        for line in llvm_file:
-            m = re_structure_type.search(line)
-            if m and m.group('struct') == struct_name:
-                elements_label = m.group('elements_label')
-                break
-
-        for line in llvm_file:
-            m = re_elements.search(line)
-            if m and m.group('label') == elements_label:
-                elements = re.findall(r'\d+', m.group('elements'))
-                break
-
-        for line in llvm_file:
-            m = re_member.search(line)
-            if m and m.group('label') in elements and m.group('member') == op_name:
-                op_index = elements.index(m.group('label'))
-                if struct_name not in structs_and_member_names:
-                    structs_and_member_names[struct_name] = []
-                    structs_and_member_indices[struct_name] = []
-                structs_and_member_names[struct_name].append(op_name)
-                structs_and_member_indices[struct_name].append(op_index)
-                break
-
-    llvm_file.seek(0)
-    # print('find_ops_structures: %s: ' + str(structs_and_member_indices)) % llvm_file.name
-    return structs_and_member_indices, structs_and_member_names
+    def normalize_path(self, depth=0):
+        if depth <= 0:
+            return
+        # Truncate depth-levels from self.source_file file path starting
+        # from the leftmost part of the path
+        split = self.source_file.split(os.path.sep)[depth:]
+        # Keep the filename even if the requested depth exceeds the number
+        # of directories in the file path
+        split = split if split else [self.source_file.split(os.path.sep)[-1]]
+        self.source_file = os.path.join(*(split))
 
 
 def get_debug_entries(llvm_file):
@@ -104,23 +73,33 @@ def get_debug_entries(llvm_file):
     re_debug_entry_location = re.compile(
         r'^(?P<key>\![0-9]+) = !DILocation\(line\: (?P<line>[0-9]+).*scope\: (?P<scope>\![0-9]+)')
 
-    # !2261 = distinct !DISubprogram(name: "update", linkageName: "_ZN2AI6updateEb", scope: !1662, file: !26, \
-    #     line: 42, type: !2214, isLocal: false, isDefinition: true, scopeLine: 43, flags: DIFlagPrototyped, \
+    # !2261 = distinct !DISubprogram(name: "update", linkageName: "_ZN2AI6updateEb", scope: !1662, file: !26,
+    #     line: 42, type: !2214, isLocal: false, isDefinition: true, scopeLine: 43, flags: DIFlagPrototyped,
     #     isOptimized: false, unit: !25, declaration: !2213, variables: !160)
     re_debug_entry_subprogram = re.compile(
         r'(?P<key>\![0-9]+) = distinct !DISubprogram.*\(.*file\: (?P<file>\![0-9]+).*line\: (?P<line>[0-9]+)')
 
-    # !2497 = distinct !DISubprogram(linkageName: "_GLOBAL__sub_I_delta_logger.cpp", scope: !20, file: !20,
-    #     type: !2498, isLocal: true, isDefinition: true, flags: DIFlagArtificial, isOptimized: false, unit: \
-    #     !19, variables: !957)
+    # !2497 = distinct !DISubprogram(linkageName: "_GLOBAL__sub_I_delta_logger.cpp", scope: !20,
+    #     file: !20, type: !2498, isLocal: true, isDefinition: true, flags: DIFlagArtificial,
+    #     isOptimized: false, unit: !19, variables: !957)
     re_debug_entry_subprogram_wo_line = re.compile(
         r'(?P<key>\![0-9]+) = distinct !DISubprogram.*\(linkageName.*file\: (?P<file>\![0-9]+)')
+
+    # !1126 = !DISubprogram(name: "acpi_error", scope: !1127,
+    #     file: !1127, line: 884, type: !1128,
+    #     flags: DIFlagPrototyped, spFlags: DISPFlagOptimized, retainedNodes: !4)
+    re_debug_entry_subprogram_wo_distinct = re.compile(
+        r'(?P<key>\![0-9]+) = !DISubprogram.*\(.*file\: (?P<file>\![0-9]+).*line\: (?P<line>[0-9]+)')
 
     # !6769 = distinct !DILexicalBlock(scope: !6764, file: !477, line: 175, column: 9)
     # !6589 = !DILexicalBlockFile(scope: !6355, file: !6357, discriminator: 0)
     re_debug_entry_lexical = re.compile(r'^(?P<key>\![0-9]+) = .*!DILexicalBlock.*\(.*file\: (?P<file>\![0-9]+)')
 
+    # @name = weak dso_local alias i32 (%struct.hstate*), i32 (%struct.hstate*)* @__name
+    re_weak_alias = re.compile(r'@(?P<realname>[\w]+).*?weak dso_local alias.*?@(?P<alias>[\w]+)')
+
     debug_cache_entries = {}
+    alias_entries = {}
 
     # Read all the debug entries we are interested
     for line in llvm_file:
@@ -154,11 +133,27 @@ def get_debug_entries(llvm_file):
             debug_cache_entries[m.group('key')] = {'file': m.group('file')}
             continue
 
+        # Subprogram without distinct
+        m = re_debug_entry_subprogram_wo_distinct.search(line)
+        if m:
+            logging.debug('Adding debug cache entry key = ' + m.group('key') + ', file = ' + m.group('file') +
+                          ', linenumber = ' + m.group('line'))
+            debug_cache_entries[m.group('key')] = {'line': m.group('line'), 'file': m.group('file')}
+            continue
+
         # Lexical block, filename is parsed later
         m = re_debug_entry_lexical.search(line)
         if m:
             logging.debug('Adding debug cache entry key = ' + m.group('key') + ', file = ' + m.group('file'))
             debug_cache_entries[m.group('key')] = {'file': m.group('file')}
+            continue
+
+        # Parse local aliases, there should not be to much of these
+        m = re_weak_alias.search(line)
+        if m:
+            logging.info('Found alias: ' + m.group('alias') + ' for name: ' + m.group('realname'))
+            alias_entries[m.group('realname')] = m.group('alias')
+            continue
 
     debug_entries = {}
 
@@ -180,7 +175,7 @@ def get_debug_entries(llvm_file):
 
     llvm_file.seek(0)
 
-    return debug_entries
+    return debug_entries, alias_entries
 
 
 def discard_duplicate_callees(callees_in_list, callees_to_be_added):
@@ -217,44 +212,66 @@ def llvm_source_name(llvm_file):
     return source_name
 
 
-def parse_llvm(llvm_file, call_graph, call_graph_lock, indirect_nodes=None):
+def parse_llvm(llvm_file, call_graph, call_graph_lock, indirect_nodes=None, declare_dso=None):
     # define void @_ZN7ObjectsC2Ev(%class.Objects*) unnamed_addr #0 align 2 !dbg !1703 {
-    re_define = re.compile(r'define.+?@(?P<name>\w+)\((?P<args>.*)\).*!dbg (?P<debug_entry>\![0-9]+) {')
+    re_define = re.compile(
+        r'(^|\s+)define\s.+?@(?P<name>\w+)\((?P<args>.*)\).*!dbg (?P<debug_entry>\![0-9]+) {')
     # call void @_ZSt8_DestroyISt10shared_ptrI10ObjectBaseEEvPT_(%"class.std::shared_ptr"* %11) #11, !dbg !2932
-    re_call = re.compile(r'call.+?@(?!llvm)(?P<name>[a-zA-Z0-9_\.:]*)\((?P<args>.*)\).*!dbg (?P<debug_entry>\![0-9]+)')
+    re_call = re.compile(
+        r'(^|\s+)call\s.+?@(?!llvm)(?P<name>[a-zA-Z0-9_\.:]*)\((?P<args>.*)\).*!dbg (?P<debug_entry>\![0-9]+)')
     # invoke void @__cxa_rethrow() #13
-    re_invoke = re.compile(r'invoke.+?@(?!llvm)(?P<name>[a-zA-Z0-9_\.:]*)\((?P<args>.*)\)')
+    re_invoke = re.compile(r'(^|\s+)invoke\s.+?@(?!llvm)(?P<name>[a-zA-Z0-9_\.:]*)\((?P<args>.*)\)')
     re_funcptr = re.compile(r'@(?P<funcptr>\w+)')
     re_getelementptr = re.compile(
-        r'%(?P<label>\w+) = getelementptr inbounds %struct.(?P<structure>\w+),.*i32 0, i32 (?P<index>[0123456789]+)')
+        r'%(?P<label>\w+) =.*getelementptr inbounds.*%struct.(?P<structure>\w+),.*i32 0, i32 (?P<index>[0123456789]+)')
     re_load = re.compile(r'%(?P<label_out>\w+) = load .*%(?P<label_in>[0123456789]+), ')
-    re_store = re.compile(r'store.+?%(?P<label_src>[0123456789]+), .*%(?P<label_dst>[0123456789]+), ')
-    re_indirect_call = re.compile(r'call.+?%(?P<label>\w+)\((?P<args>.*)\).*!dbg (?P<debug_entry>\![0-9]+)')
+    re_store = re.compile(r'(^|\s+)store\s.+?%(?P<label_src>[0123456789]+), .*%(?P<label_dst>[0123456789]+), ')
+    re_indirect_call = re.compile(r'(^|\s+)call\s.+?%(?P<label>\w+)\((?P<args>.*)\).*!dbg (?P<debug_entry>\![0-9]+)')
+    re_declare = re.compile(r'declare !dbg (?P<debug_entry>\![0-9]+) dso_local .+?@(?P<name>[\w]+)\((?P<args>.*)\)')
 
-    structs, names = find_ops_structures(llvm_file, indirect_nodes)
+    source_file = llvm_source_name(llvm_file)
+    resolved, r = detect_ops_structures(llvm_file)
+    new_indirect = get_indirect(llvm_file, resolved)
+    for operation, callees in new_indirect.items():
+        caller = Function(operation, indirect=True)
+        fcallees = []
+        for callee in callees:
+            fcallees.append(Function(callee, indirect=True))
+        with call_graph_lock:
+            if caller not in call_graph:
+                call_graph[caller] = fcallees
+                indirect_nodes.append(operation)
+            else:
+                call_graph[caller].extend(callees)
+
+    structs, names = r.find_ops_structures(indirect_nodes)
     indirect_labels = []
 
-    debug_entries = get_debug_entries(llvm_file)
-    source_file = llvm_source_name(llvm_file)
+    debug_entries, alias_entries = get_debug_entries(llvm_file)
 
     caller = None
     callees = []
+    local_declare = set()
     for line in llvm_file:
         invoke = False
-        m = re_define.search(line)
+        m = re_define.search(line) or re_declare.search(line)
         if m:
             if caller:
                 with call_graph_lock:
                     call_graph[caller] += discard_duplicate_callees(call_graph[caller], callees)
 
+            name = m.group('name')
+
             debug_entry = m.group('debug_entry')
             line_number = debug_entries[debug_entry]['line']
             filename = 'filename' in debug_entries[debug_entry] and debug_entries[
                 debug_entry]['filename'] or source_file
-            caller = Function(m.group('name'), source_file=filename, line_numbers=[line_number])
+            if 'declare !dbg' in line:
+                local_declare.add(Function(name, source_file=filename, line_numbers=[line_number]))
+                continue
 
+            caller = Function(name, source_file=filename, line_numbers=[line_number])
             callees = []
-
             indirect_labels = []
 
             with call_graph_lock:
@@ -286,6 +303,7 @@ def parse_llvm(llvm_file, call_graph, call_graph_lock, indirect_nodes=None):
                 filename = 'filename' in debug_entries[debug_entry] and debug_entries[debug_entry][
                     'filename'] or source_file
 
+                callee_name = alias_entries.get(callee_name, callee_name)
                 callee = Function(callee_name, callee_args, source_file=filename)
 
                 if callee not in callees:
@@ -335,3 +353,7 @@ def parse_llvm(llvm_file, call_graph, call_graph_lock, indirect_nodes=None):
     if caller:
         with call_graph_lock:
             call_graph[caller] += discard_duplicate_callees(call_graph[caller], callees)
+
+    if local_declare:
+        with call_graph_lock:
+            declare_dso.extend(local_declare)

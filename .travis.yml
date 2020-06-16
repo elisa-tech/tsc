@@ -28,3 +28,45 @@ matrix:
         - make install-requirements
       script:
         - make pre-push
+
+    # Sub-dir safety-architecture/tools/callgraph-tool
+    # Python version: 3.6
+    - language: python
+      dist: bionic
+      addons:
+          apt:
+              sources:
+                  - ubuntu-toolchain-r-test
+              packages:
+                  - libstdc++6
+                  - bear
+      python:
+        - "3.6"
+      before_install:
+        - cd safety-architecture/tools/callgraph-tool
+      install:
+        - make install-requirements
+      script:
+        - make pre-push
+        - make clang-indexer
+
+    # Sub-dir safety-architecture/tools/callgraph-tool
+    # Python version: 3.7
+    - language: python
+      dist: bionic
+      addons:
+          apt:
+              sources:
+                  - ubuntu-toolchain-r-test
+              packages:
+                  - libstdc++6
+                  - bear
+      python:
+        - "3.7"
+      before_install:
+        - cd safety-architecture/tools/callgraph-tool
+      install:
+        - make install-requirements
+      script:
+        - make pre-push
+        - make clang-indexer

@@ -63,3 +63,15 @@ $PATH_TO_CGTOOL/callgraph-tool.py --build $HOME/ClangBuiltLinux/tc-build/kernel/
                                   --build_log_format ll_clang
 ```
 Here, the argument to --build command line option is a directory (instead of build log file as was the case with other build log formats). The callgraph tool walks that directory recursively and picks up the files that end with .ll or .llvm. Those files are considered to be in the Clang IR format and it parses them in the same way as in previous steps. Since the intermediate files are already produced there is no need to specify Clang location for this --build_log_format option.
+
+## Clang AST Backend
+
+### AST\_CLANG
+
+This option uses clang\_indexer backend in order to generate callgraph information. It assumes that Clang tools are available in the clang\_indexer directory. The tools can be downloaded simply by running clang\_download.py script in the directory. The argument to --build option is compile commands database in JSON format. This database can easily be constructed using _bear_ tool. This database needs to be in the root of analyzed source directory. See README.md in clang\_indexer directory for more details.
+Example command to create the call graph database is:
+```
+$PATH_TO_CGTOOL/callgraph-tool.py --build $HOME/linux-stable/compile_commands.json \
+                                  --build_log_format ast_clang \
+                                  --clang $PATH_TO_CGTOOL/clang_indexer/clang/bin/bin/clang
+```
