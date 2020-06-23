@@ -1,0 +1,40 @@
+{
+    "caller":
+    {
+        "function": 
+        {
+            "exclude":
+            {
+                "contains": ["builtin", "trace_", "kasan_",
+                             "test_", "printk", "strncmp",
+                             "compiletime_assert"]
+            }
+        },
+        "filename":
+        {
+            "include":
+            {
+                "contains": ["mm/"]
+            }
+        }
+    },
+    "callee":
+    {
+        "function": 
+        {
+            "exclude" :
+            {
+                "contains": ["builtin", "trace_", "kasan_",
+                             "test_", "printk", "strncmp",
+                             "compiletime_assert"]
+            }
+        },
+        "filename":
+        {
+            "include":
+            {
+                "contains": ["mm/"]
+            }
+        }
+    }
+}
