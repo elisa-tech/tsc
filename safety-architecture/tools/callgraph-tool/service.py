@@ -423,6 +423,11 @@ class Service:
 
     def show_graphviz(self, view_type):
         self._dot_source += "}\n"
+        if view_type == "dot":
+            with open("callgraph.dot", "w") as f:
+                f.write(self._dot_source)
+                logging.info("Wrote %s" % f.name)
+                return
         filename = '/tmp/callgraph.%s' % view_type
         cgu.exec_cmd_with_stdin("dot -T%s -o%s && xdg-open %s" %
                                 (view_type, filename, filename), self._dot_source)

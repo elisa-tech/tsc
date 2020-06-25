@@ -11,6 +11,7 @@ import pickle
 import sys
 import time
 import yaml
+import re
 
 ROOT_FOLDER = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(ROOT_FOLDER + "/..")
@@ -363,6 +364,21 @@ def test_callgraph_search_inverse_graph(set_up_test_data):
 
     test = """\x1b[37;1mfunction_1 <- main\x1b[0m\n  main <- main.main\n"""
     assert output == test
+
+
+def test_callgraph_view_graph(set_up_test_data):
+    process_result = subprocess.run([CALLGRAPH_PY,
+                                     "--graph", "main",
+                                     "--db", "call_graph.pickle",
+                                     "--view", "--view_type", "dot",
+                                    "--coverage_file", "coverage_file.txt"],
+                                    cwd=ROOT_FOLDER + "/callgraph_tool_test_data",
+                                    stdout=subprocess.PIPE, timeout=1)
+    assert process_result.returncode == 0
+    dotfile = ROOT_FOLDER + "/callgraph_tool_test_data/callgraph.dot"
+    assert os.path.isfile(dotfile)
+    matches = [re.findall(r'color=\"green\"', line) for line in open(dotfile)]
+    assert len(matches) > 0
 
 
 if __name__ == "__main__":
