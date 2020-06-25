@@ -214,9 +214,10 @@ class Service:
                     "Non-unique function name in coverage data: %s" % function.name)
             # From the entries that match based on function name, match by file name:
             # color them green
-            df = df[(df['file'].str.contains(function.source_file))]
-            if df.shape[0] == 1:
-                color = "green"
+            if function.source_file:
+                df = df[(df['file'].str.contains(function.source_file))]
+                if df.shape[0] == 1:
+                    color = "green"
         return '"%s" [label="%s\n%s\n%s\nline:%s", URL="%s", style=%s, color="%s"]\n' % (
             function.name,
             cgu.demangle(function.name),
