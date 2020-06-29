@@ -17,3 +17,4 @@ pytest
 pytest-cov
 reuse
 IPython
+graphviz
