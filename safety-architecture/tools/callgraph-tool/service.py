@@ -218,10 +218,9 @@ class Service:
                 df = df[(df['file'].str.contains(function.source_file))]
                 if df.shape[0] == 1:
                     color = "green"
-        return '"%s" [label="%s\n%s\n%s\nline:%s", URL="%s", style=%s, color="%s"]\n' % (
+        return '"%s" [label="%s\n%s\nline:%s", URL="%s", style=%s, color="%s"]\n' % (
             function.name,
-            cgu.demangle(function.name),
-            function.name,
+            fname,
             function.source_file,
             str(line_numbers),
             url,
