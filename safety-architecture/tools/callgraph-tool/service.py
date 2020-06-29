@@ -179,13 +179,22 @@ class Service:
             view_base_dir += "/"
         if function.source_file:
             url = "file://" + view_base_dir + function.source_file
-        return '"%s" [label="%s\n%s\n%s\nline:%s", URL="%s", style=%s]\n' % (function.name,
-                                                                             cgu.demangle(function.name),
-                                                                             function.name,
-                                                                             function.source_file,
-                                                                             str(line_numbers),
-                                                                             url,
-                                                                             style)
+
+        fname = function.name
+        dfname = cgu.demangle(function.name)
+        if fname != dfname:
+            fname = dfname + '\n' + fname
+        if isinstance(line_numbers, list):
+            # sometimes macro expansions result in multiple calls to same function in one line
+            line_numbers = list(set(line_numbers))
+        return '"%s" [label="%s\n%s\nline:%s", URL="%s", style=%s, color="%s"]\n' % (
+            function.name,
+            fname,
+            function.source_file,
+            str(line_numbers),
+            url,
+            style,
+            color)
 
     def add_connection(self, caller, callee, color="black", direction="forward", view_base_dir="/", line_number=""):
         url = ""
@@ -195,8 +204,10 @@ class Service:
             url = "file://" + view_base_dir + callee.source_file
 
         callee_args = list()
-        for arg in callee.args:
-            callee_args.append(cgu.demangle(arg))
+        if isinstance(line_number, list):
+            line_number = list(set(line_number))
+        # for arg in callee.args:
+        #    callee_args.append(cgu.demangle(arg))
 
         return '"%s" -> "%s" [label="%s", color="%s", dir="%s", URL="%s"]\n' % (caller.name,
                                                                                 callee.name,
