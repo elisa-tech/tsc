@@ -318,6 +318,7 @@ class Service:
                 keys = list(self._call_graph.keys())
                 function_in_call_graph = keys[keys.index(function)]
                 line_numbers = function_in_call_graph.line_numbers
+                function.source_file = function_in_call_graph.source_file
             else:
                 line_numbers = []
             self._dot_source += self.add_node_for_function(
