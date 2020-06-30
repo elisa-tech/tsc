@@ -373,7 +373,7 @@ def test_callgraph_view_graph(set_up_test_data):
                                      "--view", "--view_type", "dot",
                                     "--coverage_file", "coverage_file.txt"],
                                     cwd=ROOT_FOLDER + "/callgraph_tool_test_data",
-                                    stdout=subprocess.PIPE, timeout=1)
+                                    stdout=subprocess.PIPE)
     assert process_result.returncode == 0
     dotfile = ROOT_FOLDER + "/callgraph_tool_test_data/callgraph.dot"
     assert os.path.isfile(dotfile)
