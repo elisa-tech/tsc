@@ -48,7 +48,8 @@ class Service:
         return
 
     def serve(self, args):
-        self.functionality_writer(cgu.ansi_highlight("\nserve %s\n" % args, '38;5;206'))
+        self.functionality_writer(cgu.ansi_highlight(
+            "\nserve %s\n" % args, '38;5;206'))
 
         with capture_output() as c:
             self.parse(args)
@@ -59,6 +60,17 @@ class Service:
         # Always reset these
         self._dot_source = dot_source_lr
         self._suppress_from_graph = dict(default_suppress_from_graph)
+        self.df_cov = None
+
+        if args['coverage_file']:
+            headers = ['file', 'function']
+            self.df_cov = pd.read_csv(
+                args['coverage_file'], names=headers, sep=":")
+            self.df_cov.reset_index(drop=True, inplace=True)
+            if self.df_cov.isnull().values.any():
+                logging.error("Empty values in coverage data: %s" %
+                              args['coverage_file'])
+                exit()
 
         if args['no_indirect']:
             to_be_deleted = []
@@ -134,7 +146,8 @@ class Service:
                     if args['view']:
                         self.show_graphviz(args['view_type'])
                     return
-            self.functionality_writer("Can't find code path between " + args['path'])
+            self.functionality_writer(
+                "Can't find code path between " + args['path'])
 
         if args['multipath']:
             self.build_callees()
@@ -157,7 +170,8 @@ class Service:
             for i in range(args['depth']):
                 logging.debug('Depth %d' % i)
                 breadcrumbs = []
-                self.find_multipath_recursive(path_from, path_to, breadcrumbs, max_depth=i)
+                self.find_multipath_recursive(
+                    path_from, path_to, breadcrumbs, max_depth=i)
 
             for syscall in multipath_order:
                 if syscall in self._multipath_output:
@@ -167,7 +181,8 @@ class Service:
 
         if args['map_trigger']:
             if not os.path.isfile(args['trgdb']):
-                self.functionality_writer("Warning: Trigger database does not exist")
+                self.functionality_writer(
+                    "Warning: Trigger database does not exist")
             for trigger in self._trigger_map:
                 for callee in self._trigger_map[trigger]:
                     if callee.name == args['map_trigger']:
@@ -175,11 +190,7 @@ class Service:
 
     def add_node_for_function(self, function, line_numbers, style="solid", view_base_dir="/"):
         url = ""
-        if not view_base_dir.endswith("/"):
-            view_base_dir += "/"
-        if function.source_file:
-            url = "file://" + view_base_dir + function.source_file
-
+        color = "black"
         fname = function.name
         dfname = cgu.demangle(function.name)
         if fname != dfname:
@@ -187,6 +198,26 @@ class Service:
         if isinstance(line_numbers, list):
             # sometimes macro expansions result in multiple calls to same function in one line
             line_numbers = list(set(line_numbers))
+        if not view_base_dir.endswith("/"):
+            view_base_dir += "/"
+        if function.source_file:
+            url = "file://" + view_base_dir + function.source_file
+        else:
+            logging.error("Node missing file name: %s" % function.name)
+        if self.df_cov is not None:
+            # Select only based on function name: color them yellow
+            df = self.df_cov[(self.df_cov['function'] == function.name)]
+            if df.shape[0] == 1:
+                color = "yellow3"
+            elif df.shape[0] > 1:
+                logging.error(
+                    "Non-unique function name in coverage data: %s" % function.name)
+            # From the entries that match based on function name, match by file name:
+            # color them green
+            if function.source_file:
+                df = df[(df['file'].str.contains(function.source_file))]
+                if df.shape[0] == 1:
+                    color = "green"
         return '"%s" [label="%s\n%s\nline:%s", URL="%s", style=%s, color="%s"]\n' % (
             function.name,
             fname,
@@ -253,7 +284,8 @@ class Service:
             for _ in range(lvl):
                 pad += '  '
 
-            callees_str = '%s%s -> %s' % (pad, function.name, ', '.join(str(c) for c in callees))
+            callees_str = '%s%s -> %s' % (pad, function.name,
+                                          ', '.join(str(c) for c in callees))
             if lvl % 2 == 0:
                 self.functionality_writer(cgu.ansi_highlight(callees_str))
             else:
@@ -288,7 +320,8 @@ class Service:
                 line_numbers = function_in_call_graph.line_numbers
             else:
                 line_numbers = []
-            self._dot_source += self.add_node_for_function(function, line_numbers, view_base_dir=view_base_dir)
+            self._dot_source += self.add_node_for_function(
+                function, line_numbers, view_base_dir=view_base_dir)
             for caller in callers:
                 if caller.args:
                     self._dot_source += self.add_connection(function, caller, color="blue", direction="back",
@@ -309,10 +342,12 @@ class Service:
                                                                view_base_dir=view_base_dir)
 
             if lvl >= max_depth:
-                self._dot_source += '"%s" -> "..." [dir=back]\n' % (function.name)
+                self._dot_source += '"%s" -> "..." [dir=back]\n' % (
+                    function.name)
                 return
         else:
-            callers_str = '%s%s <- %s' % (pad, function, ', '.join(str(c) for c in callers))
+            callers_str = '%s%s <- %s' % (pad, function,
+                                          ', '.join(str(c) for c in callers))
             if lvl % 2 == 0:
                 self.functionality_writer(cgu.ansi_highlight(callers_str))
             else:
@@ -342,14 +377,18 @@ class Service:
                 breadcrumbs.append(path_to)
                 if dot:
                     if not reverse:
-                        self._dot_source += ' -> '.join(str(b) for b in breadcrumbs)
+                        self._dot_source += ' -> '.join(str(b)
+                                                        for b in breadcrumbs)
                     else:
-                        self._dot_source += ' -> '.join(str(b) for b in breadcrumbs[::-1]) + ' [dir=back]'
+                        self._dot_source += ' -> '.join(str(b)
+                                                        for b in breadcrumbs[::-1]) + ' [dir=back]'
                 else:
                     if not reverse:
-                        self.functionality_writer(' -> '.join(str(b) for b in breadcrumbs))
+                        self.functionality_writer(
+                            ' -> '.join(str(b) for b in breadcrumbs))
                     else:
-                        self.functionality_writer(' <- '.join(str(b) for b in breadcrumbs[::-1]))
+                        self.functionality_writer(
+                            ' <- '.join(str(b) for b in breadcrumbs[::-1]))
                 return True
             else:
                 if self.find_path_recursive(callee, path_to, list(breadcrumbs), lvl + 1, max_depth, reverse, dot):
@@ -384,8 +423,14 @@ class Service:
 
     def show_graphviz(self, view_type):
         self._dot_source += "}\n"
+        if view_type == "dot":
+            with open("callgraph.dot", "w") as f:
+                f.write(self._dot_source)
+                logging.info("Wrote %s" % f.name)
+                return
         filename = '/tmp/callgraph.%s' % view_type
-        cgu.exec_cmd_with_stdin("dot -T%s -o%s && xdg-open %s" % (view_type, filename, filename), self._dot_source)
+        cgu.exec_cmd_with_stdin("dot -T%s -o%s && xdg-open %s" %
+                                (view_type, filename, filename), self._dot_source)
 
     def build_callees(self, fetch_src_info=True):
         self._inverse_call_graph = {}
@@ -435,7 +480,8 @@ class Service:
             record_slot = []
             for callee_single in callees_of_f:
                 if not extended:
-                    record_slot.append((callee_single, funcname, callee_single.indirect))
+                    record_slot.append(
+                        (callee_single, funcname, callee_single.indirect))
                 else:
                     raise NotImplementedError
             call_connections.extend(record_slot)
@@ -460,10 +506,12 @@ class Service:
             for caller_single in callers_of_f:
                 if not extended:
                     cols = ["Callee", "Caller", "Indirect"]
-                    record_slot.append((funcname, caller_single, caller_single.indirect))
+                    record_slot.append(
+                        (funcname, caller_single, caller_single.indirect))
                 else:
                     cols = ["Callee", "File", "Line", "Caller", "Indirect"]
-                    record_slot.append(record + (caller_single, caller_single.indirect))
+                    record_slot.append(
+                        record + (caller_single, caller_single.indirect))
             call_connections.extend(record_slot)
 
         return call_connections, cols

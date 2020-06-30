@@ -103,6 +103,9 @@ def get_args():
     search_args.add_argument('--normalize_path', '-np', default=0, type=int,
                              help='On loading the DB, chop n-levels starting from the leftmost part of all '
                              'file paths')
+    search_args.add_argument('--coverage_file', '-cf', default=None,
+                             help='On viewing the graph, visually highlight the functions listed in the '
+                             'specified file to indicate test coverage')
 
     # Search optimization arguments
     search_op_args = parser.add_argument_group('Search optimization arguments')
@@ -128,6 +131,10 @@ def main():
         log_level = logging.DEBUG
 
     logging.basicConfig(format=log_format, level=log_level)
+
+    if args.coverage_file and not os.path.isfile(args.coverage_file):
+        logging.error("File not found or no permissions: \"%s\"" % args.coverage_file)
+        exit(1)
 
     print_env(args)
 
