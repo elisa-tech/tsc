@@ -215,7 +215,7 @@ class Service:
         pct = ""
         # Prefer matches in df_both, otherwise use df_func
         df = df_both if df_both.shape[0] >= 1 else df_func
-        if not 'percent' in list(df.columns.values):
+        if 'percent' not in list(df.columns.values):
             pct = ""
         elif df.shape[0] == 1:
             val = pd.to_numeric(df['percent'], errors='coerce').values[0]
