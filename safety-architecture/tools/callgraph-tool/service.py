@@ -63,13 +63,18 @@ class Service:
         self.df_cov = None
 
         if args['coverage_file']:
-            headers = ['file', 'function']
-            self.df_cov = pd.read_csv(
-                args['coverage_file'], names=headers, sep=":")
+            self.df_cov = pd.read_csv(args['coverage_file'], sep=",")
             self.df_cov.reset_index(drop=True, inplace=True)
+            self.df_cov.columns = self.df_cov.columns.str.lower()
+            require_cols = ['function', 'filename']
+            if not all(x in list(self.df_cov.columns.values) for x in require_cols):
+                logging.error(
+                    "Coverage file '%s' missing required headers: %s" % (
+                        args['coverage_file'], require_cols))
+                exit()
             if self.df_cov.isnull().values.any():
-                logging.error("Empty values in coverage data: %s" %
-                              args['coverage_file'])
+                logging.error(
+                    "Empty values in coverage data: %s" % args['coverage_file'])
                 exit()
 
         if args['no_indirect']:
@@ -188,9 +193,43 @@ class Service:
                     if callee.name == args['map_trigger']:
                         self.functionality_writer(trigger)
 
+    def get_node_coverage_properties(self, function):
+        # Color
+        color = "black"
+        if self.df_cov is None:
+            return color
+        # Select only based on function name: color them yellow
+        df_func = self.df_cov[(self.df_cov['function'] == function.name)]
+        if df_func.shape[0] == 1:
+            color = "yellow3"
+        # From the entries that match based on function name, match by file name:
+        # color them green
+        df_both = df_func
+        if function.source_file and df_func.shape[0] >= 1:
+            df_both = df_func[(
+                df_func['filename'].str.contains(function.source_file))]
+            if df_both.shape[0] == 1:
+                color = "green"
+
+        # Get the coverage percentage if it's available in the coverage data
+        pct = ""
+        # Prefer matches in df_both, otherwise use df_func
+        df = df_both if df_both.shape[0] >= 1 else df_func
+        if not 'percent' in list(df.columns.values):
+            pct = ""
+        elif df.shape[0] == 1:
+            val = pd.to_numeric(df['percent'], errors='coerce').values[0]
+            if not pd.isna(val):
+                pct = "\ncoverage: %s%%" % (int(round(val)))
+            else:
+                pct = "\ncoverage: NAN"
+        elif df.shape[0] < 1:
+            pct = "\ncoverage: (no coverage info)"
+
+        return color, pct
+
     def add_node_for_function(self, function, line_numbers, style="solid", view_base_dir="/"):
         url = ""
-        color = "black"
         fname = function.name
         dfname = cgu.demangle(function.name)
         if fname != dfname:
@@ -204,25 +243,13 @@ class Service:
             url = "file://" + view_base_dir + function.source_file
         else:
             logging.error("Node missing file name: %s" % function.name)
-        if self.df_cov is not None:
-            # Select only based on function name: color them yellow
-            df = self.df_cov[(self.df_cov['function'] == function.name)]
-            if df.shape[0] == 1:
-                color = "yellow3"
-            elif df.shape[0] > 1:
-                logging.error(
-                    "Non-unique function name in coverage data: %s" % function.name)
-            # From the entries that match based on function name, match by file name:
-            # color them green
-            if function.source_file:
-                df = df[(df['file'].str.contains(function.source_file))]
-                if df.shape[0] == 1:
-                    color = "green"
-        return '"%s" [label="%s\n%s\nline:%s", URL="%s", style=%s, color="%s"]\n' % (
+        color, pct = self.get_node_coverage_properties(function)
+        return '"%s" [label="%s\n%s\nline:%s%s", URL="%s", style=%s, color="%s"]\n' % (
             function.name,
             fname,
             function.source_file,
             str(line_numbers),
+            pct,
             url,
             style,
             color)
