@@ -7,13 +7,12 @@ SPDX-License-Identifier: Apache-2.0
 # Collecting gcov data for call graph visualization
 
 ## Prerequisities
-In order to follow this steps it is necessary to have at least GCC minimum version 8 on the system. Also for creating Debian Stretch image it is
-required to install debootstrap package.
-This can be simply done with
+In order to follow the steps provided in this document it is necessary to have at least GCC minimum version 8 on the system. Also, for creating Debian Stretch image it is
+required to install debootstrap package:
 ```
 sudo apt install gcc-8 qemu-system-x86 debootstrap
 ```
-on Ubuntu 18.04. The instruction assumes that all necessary files are extracted into folder at path $HOME/kernel-sandbox.
+The instructions assume that all necessary files are extracted into folder at path $HOME/kernel-sandbox.
 ```
 mkdir $HOME/kernel-sandbox
 tar -xf covviz.tar.xz --directory $HOME/kernel-sandbox
@@ -22,12 +21,13 @@ tar -xf covviz.tar.xz --directory $HOME/kernel-sandbox
 ## Creating Linux image for Qemu run
 
 In order to collect coverage information for callgraph visulization it is necessary to create Linux image with gcov options enabled.
-We followed instructions provided in Google's syzkaller [documentation](https://github.com/google/syzkaller/blob/master/docs/linux/setup_ubuntu-host_qemu-vm_x86-64-kernel.md). Additionally, we included GCOV related configuration options as noted in Linux gcov [documentation](https://www.kernel.org/doc/html/v4.14/dev-tools/gcov.html). The resulting configuration (_covconfig_) is a part of this repository. In order to reproduce the results it is necessary to run following commands:
+We followed instructions provided in Google's syzkaller [documentation](https://github.com/google/syzkaller/blob/master/docs/linux/setup_ubuntu-host_qemu-vm_x86-64-kernel.md). Additionally, we included GCOV related configuration options as noted in Linux gcov [documentation](https://www.kernel.org/doc/html/v4.14/dev-tools/gcov.html). The resulting configuration (_covconfig_) is a part of this repository (archive file). In order to reproduce the results it is necessary to run following commands in the kernel-sandbox dir:
 ```
+cd $HOME/kernel-sandbox
 git clone git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
 cd linux
 git checkout 7c30b859a947535f2213277e827d7ac7dcff9c84
-cp $PATH_TO_REPO/covconfig  .config
+cp ../covconfig  .config
 make CC=gcc-8 olddefconfig
 make -j `nproc`
 ```
@@ -55,9 +55,8 @@ STATIC=1 make
 After the stress-ng is successfully built run the following command:
 ```
 ./cp_sng.sh
-
-This will transfer test scripts to the virtual machine target.
 ```
+This will transfer test scripts to the virtual machine target. Script _jobs.sh_ contains list of stress-ng stressor commands to execute.
 
 # Collecting the data and conversion to callgraph coverage format
 
