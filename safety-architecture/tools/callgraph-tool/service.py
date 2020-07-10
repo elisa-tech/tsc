@@ -63,7 +63,7 @@ class Service:
         self.df_cov = None
 
         if args['coverage_file']:
-            self.df_cov = pd.read_csv(args['coverage_file'], sep=",")
+            self.df_cov = pd.read_csv(args['coverage_file'], sep=None, engine='python')
             self.df_cov.reset_index(drop=True, inplace=True)
             self.df_cov.columns = self.df_cov.columns.str.lower()
             require_cols = ['function', 'filename']
@@ -200,7 +200,7 @@ class Service:
             return color
         # Select only based on function name: color them yellow
         df_func = self.df_cov[(self.df_cov['function'] == function.name)]
-        if df_func.shape[0] == 1:
+        if df_func.shape[0] >= 1:
             color = "yellow3"
         # From the entries that match based on function name, match by file name:
         # color them green
@@ -208,7 +208,7 @@ class Service:
         if function.source_file and df_func.shape[0] >= 1:
             df_both = df_func[(
                 df_func['filename'].str.contains(function.source_file))]
-            if df_both.shape[0] == 1:
+            if df_both.shape[0] >= 1:
                 color = "green"
 
         # Get the coverage percentage if it's available in the coverage data
@@ -225,6 +225,8 @@ class Service:
                 pct = "\ncoverage: NAN"
         elif df.shape[0] < 1:
             pct = "\ncoverage: (no coverage info)"
+        elif df.shape[0] > 1:
+            pct = "\ncoverage: (unknown)"
 
         return color, pct
 
