@@ -29,9 +29,9 @@ cd linux
 git checkout 7c30b859a947535f2213277e827d7ac7dcff9c84
 cp ../covconfig  .config
 make CC=gcc-8 olddefconfig
-make -j `nproc`
+make CC=gcc-8 -j `nproc`
 ```
-In kernel-sandbox directory create subdirectory for stretch image:
+In kernel-sandbox directory create subdirectory for Stretch image:
 ```
 mkdir stretch && cd stretch
 wget https://raw.githubusercontent.com/google/syzkaller/master/tools/create-image.sh -O create-image.sh
