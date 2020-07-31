@@ -73,6 +73,8 @@ def get_args():
                             '  ' + BuildLogFormat.AST_CLANG.value + ' = reads compile_commands.json database\n'
                             '  ' + BuildLogFormat.CPLUSPLUS.value + ' = plain build log from c++ builds')
     build_args.add_argument('--build_exclude', '-be', default='tools,scripts', help='Exclude files/directories')
+    build_args.add_argument('--projroot', default='', help='Path to the source code for which we build call graph.\n'
+                            'If not specified, path is deduced from build argument.')
     build_args.add_argument('--build_trigger_map', action='store_true', help='Build flat trigger map only')
     build_args.add_argument('--arch', default='x86', help='Target architecture')
     build_args.add_argument('--clang', default='clang', help='Path to clang executable')
