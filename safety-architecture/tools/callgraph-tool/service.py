@@ -89,7 +89,7 @@ class Service:
             for caller in to_be_deleted:
                 del self._call_graph[caller]
 
-        if args['depth'] < 0:
+        if args['depth'] <= 0:
             if args['graph'] or args['inverse_graph']:
                 args['depth'] = 3
             elif args['multipath']:
@@ -102,7 +102,7 @@ class Service:
             for key in self._call_graph.keys():
                 if key.name != function.name:
                     continue
-                self.show_callees_recursive(key, max_depth=args['depth'], dot=args['view'],
+                self.show_callees_recursive(key, max_depth=args['depth']-1, dot=args['view'],
                                             view_base_dir=args['view_base_dir'])
                 break
 
@@ -112,7 +112,7 @@ class Service:
         if args['inverse_graph']:
             self.build_callees()
             self.show_callers_recursive(Function(args['inverse_graph']),
-                                        max_depth=args['depth'], dot=args['view'],
+                                        max_depth=args['depth']-1, dot=args['view'],
                                         view_base_dir=args['view_base_dir'])
             if args['view']:
                 self.show_graphviz(args['view_type'])
