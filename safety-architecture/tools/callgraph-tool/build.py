@@ -22,6 +22,13 @@ def valid_llvm_extensions():
     return LLVM_EXT
 
 
+def get_build_root(buildpath):
+    path = os.path.expanduser(buildpath)
+    if not os.path.isdir(path):
+        path = os.path.dirname(path)
+    return os.path.abspath(os.path.normpath(path))
+
+
 class BuildLogFormat(Enum):
     KERNEL_C = 'kernel_c'
     KERNEL_CLANG = 'kernel_clang'
@@ -83,6 +90,7 @@ def clang_indexer_build(args, call_graph):
 
 
 def build_call_graph(args, call_graph):
+    args.projroot = args.projroot if args.projroot else get_build_root(args.build[0])
     args.build[0] = convert_build_file(args.build[0], args.build_log_format)
 
     if args.build_log_format == BuildLogFormat.AST_CLANG:
@@ -328,6 +336,8 @@ class Engine(object):
             self.Command = ClangKernel
         elif args.build_log_format == BuildLogFormat.LL_CLANG:
             self.Command = ClangLL
+            self.build_exclude = [args.projroot + '/' +
+                                  exclude for exclude in self.build_exclude]
         elif args.build_log_format == BuildLogFormat.CPLUSPLUS:
             self.Command = ClangCpp
         else:
