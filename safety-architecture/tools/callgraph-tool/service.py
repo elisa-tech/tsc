@@ -197,7 +197,7 @@ class Service:
         # Color
         color = "black"
         if self.df_cov is None:
-            return color
+            return color, ""
         # Select only based on function name: color them yellow
         df_func = self.df_cov[(self.df_cov['function'] == function.name)]
         if df_func.shape[0] >= 1:
