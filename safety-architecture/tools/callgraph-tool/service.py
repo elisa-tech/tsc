@@ -306,7 +306,6 @@ class Service:
                                                                view_base_dir=view_base_dir)
 
             if lvl >= max_depth:
-                self._dot_source += '"%s" -> "..."\n' % (function.name)
                 return
         else:
             pad = ''
@@ -321,7 +320,6 @@ class Service:
                 self.functionality_writer(callees_str)
 
             if lvl >= max_depth:
-                self.functionality_writer('%s  ...' % (pad))
                 return
 
         for callee in callees:
@@ -372,8 +370,6 @@ class Service:
                                                                view_base_dir=view_base_dir)
 
             if lvl >= max_depth:
-                self._dot_source += '"%s" -> "..." [dir=back]\n' % (
-                    function.name)
                 return
         else:
             callers_str = '%s%s <- %s' % (pad, function,
@@ -384,7 +380,6 @@ class Service:
                 self.functionality_writer(callers_str)
 
             if lvl >= max_depth:
-                self.functionality_writer('%s  ...' % (pad))
                 return
 
         for caller in callers:
