@@ -124,6 +124,19 @@ def convert(build_log, build_log_format, temp_file):
         logging.info("plain log")
         return False, "."
 
+    if BuildLogFormat.LL_CLANG == build_log_format:
+        # scan build_log dir
+        ll_files = []
+        valid_ext = valid_llvm_extensions()
+        for root, _, fnames in os.walk(build_log):
+            for fname in fnames:
+                for ext in valid_ext:
+                    if fname.endswith(ext):
+                        ll_files.append(os.path.join(root, fname))
+                        break
+        temp_file.write('\n'.join(ll_files))
+        return True, '.'
+
     raise ValueError("Not implemented log format: " + str(build_log_format))
 
 
