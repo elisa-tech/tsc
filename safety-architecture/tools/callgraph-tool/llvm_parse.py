@@ -233,10 +233,10 @@ def parse_llvm(llvm_file, call_graph, call_graph_lock, indirect_nodes=None, decl
     resolved, r = detect_ops_structures(llvm_file)
     new_indirect = get_indirect(llvm_file, resolved)
     for operation, callees in new_indirect.items():
-        caller = Function(operation, indirect=True)
+        caller = Function(operation, indirect=True, source_file=source_file)
         fcallees = []
         for callee in callees:
-            fcallees.append(Function(callee, indirect=True))
+            fcallees.append(Function(callee, indirect=True, source_file=source_file))
         with call_graph_lock:
             if caller not in call_graph:
                 call_graph[caller] = fcallees
