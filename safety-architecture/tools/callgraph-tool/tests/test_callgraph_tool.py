@@ -21,6 +21,7 @@ from db import GraphDb  # noqa E402
 
 # To test the deployed version change the location below to point to right file.
 CALLGRAPH_PY = ROOT_FOLDER + "/../callgraph-tool.py"
+TEST_FOLDER = ROOT_FOLDER + "/callgraph_tool_test_data"
 server = None
 
 
@@ -135,6 +136,63 @@ def test_callgraph_tool_build(set_up_test_data):
     assert excluded_function_2 not in call_graph
 
     check_trigger_map()
+
+
+def test_callgraph_tool_indirect_detect(set_up_test_data):
+    ret = subprocess.call([CALLGRAPH_PY, "--db", "ind_call_graph.pickle", "--build", TEST_FOLDER + "/template",
+                          "--build_log_format", "ll_clang"], stdout=subprocess.PIPE, cwd=TEST_FOLDER)
+    assert ret == 0
+
+    assert os.path.isfile(TEST_FOLDER + "/ind_call_graph.pickle")
+
+    call_graph = GraphDb(TEST_FOLDER + "/ind_call_graph.pickle")
+    call_graph.open()
+
+    caller_main = Function("main", source_file="init/main.c", line_numbers=["5"])
+    caller_f1_main = Function("f1_main", source_file="init/main.c")
+    caller_f2_main = Function("f2_main", source_file="init/main.c")
+    caller_f3_main = Function("f3_main", source_file="init/main.c")
+    caller_f4_main = Function("f4_main", source_file="init/main.c")
+    caller_f5_main = Function("f5_main", source_file="init/main.c")
+    caller_f6_main = Function("f6_main", source_file="init/main.c")
+    caller_f7_main = Function("f7_main", source_file="init/main.c")
+
+    assert caller_main in call_graph
+    assert caller_f1_main in call_graph
+    assert caller_f2_main in call_graph
+
+    caller_m_ops_exec1 = Function("m_ops.exec1")
+    caller_m_ops_exec2 = Function("m_ops.exec2")
+    callee_m_ifunc1 = Function("m_ifunc1")
+    callee_m_ifunc2 = Function("m_ifunc2")
+
+    assert callee_m_ifunc1 in call_graph[caller_m_ops_exec1]
+    assert callee_m_ifunc2 in call_graph[caller_m_ops_exec2]
+
+    caller_as_operations_writepage = Function("as_operations.writepage")
+    caller_as_operations_readpage = Function("as_operations.readpage")
+    callee_f3_wp = Function("f3_wp")
+    callee_f3_rp = Function("f3_rp")
+
+    assert callee_f3_wp in call_graph[caller_as_operations_writepage]
+    assert callee_f3_rp in call_graph[caller_as_operations_readpage]
+
+    callee_ops1_callback = Function("ops1.callback")
+    caller_ops1_callback = Function("ops1.callback")
+    callee_f5_cb_impl = Function("f5_cb_impl")
+
+    assert callee_ops1_callback in call_graph[caller_f5_main]
+    assert callee_f5_cb_impl in call_graph[caller_ops1_callback]
+
+    caller_obs_kernel_param_setup_func = Function("obs_kernel_param.setup_func")
+    callee_setup_show_lapic = Function("setup_show_lapic")
+
+    assert callee_setup_show_lapic in call_graph[caller_obs_kernel_param_setup_func]
+
+    caller_aligned_ops_callback = Function("aligned_ops.callback")
+    callee_f7_cb_implement = Function("f7_cb_implement")
+
+    assert callee_f7_cb_implement in call_graph[caller_aligned_ops_callback]
 
 
 def test_callgraph_tool_client_server(set_up_test_data):

@@ -70,7 +70,6 @@ def get_missing_nodes(config, call_graph, dso_declare):
             if node_in not in call_graph.keys() and node_in not in missing_nodes:
                 logging.info("Missing node: %s found in the edge from %s" % (node_in.name, node_out.name))
                 missing_nodes.append(node_in)
-    print("Missing %s nodes found in edges" % len(missing_nodes))
     nodes = [Function(node.name, args=node.args) for node in missing_nodes]
     return nodes
 
@@ -104,8 +103,6 @@ def build_call_graph(args, call_graph):
     call_graph_lock = manager.Lock()
     tmp_call_graph = manager.dict()
     tmp_dso_declare = manager.list()
-
-    print("Proceed to LLVM parse")
 
     with open(args.build[0], "r") as ins:
         try:
