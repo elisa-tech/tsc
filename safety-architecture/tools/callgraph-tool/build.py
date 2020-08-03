@@ -186,26 +186,34 @@ def mips_modifications(cc_command):
 
 class ClangCommand(object):
 
-    def __init__(self, cc_command, arch, clang_path):
+    def __init__(self, cc_command, arch, clang_path, isystem='auto'):
         self.command = cc_command
         self.cc_args = ''
         self.filename = ''
         self.output = None
         self.arch = arch
         self.clang_path = clang_path
+        self.isystem = isystem
         self._convert()
+
+    def _builtin(self):
+        builtin = ''
+        if self.isystem == 'auto':
+            builtin = ''
+        else:
+            builtin = '-fno-builtin'
+            if self.arch == 'x86':
+                builtin += ' -nobuiltininc'
+        return builtin
 
     def _convert(self):
         self._remove_unsupported_args()
         self._turn_of_optimizations()
         self.valid = self._extract_params()
         if self.valid:
-            if self.arch == 'x86':
-                self.command = "%s %s -g -fno-builtin -nobuiltininc -S -emit-llvm %s -o %s%s" % (
-                    self.clang_path, self.cc_args, self.filename, self.filename, DEF_LLVM_EXT)
-            elif self.arch == 'mips':
-                self.command = "%s %s -g -fno-builtin -S -emit-llvm %s -o %s%s" % (
-                    self.clang_path, self.cc_args, self.filename, self.filename, DEF_LLVM_EXT)
+            builtin = self._builtin()
+            self.command = "%s %s -g %s -S -emit-llvm %s -o %s%s" % (
+                    self.clang_path, self.cc_args, builtin, self.filename, self.filename, DEF_LLVM_EXT)
 
     def _turn_of_optimizations(self):
         # turn off function inlining
@@ -288,12 +296,9 @@ class ClangKernel(ClangCommand):
         self._turn_of_optimizations()
         self.valid = self._extract_params()
         if self.valid:
-            if self.arch == 'x86':
-                self.command = "%s %s -g -fno-builtin -nobuiltininc -S -emit-llvm %s -o %s%s" % (
-                    self.clang_path, self.cc_args, self.filename, self.filename, DEF_LLVM_EXT)
-            elif self.arch == 'mips':
-                self.command = "%s %s -g -fno-builtin -S -emit-llvm %s -o %s%s" % (
-                    self.clang_path, self.cc_args, self.filename, self.filename, DEF_LLVM_EXT)
+            builtin = self._builtin()
+            self.command = "%s %s -g %s -S -emit-llvm %s -o %s%s" % (
+                    self.clang_path, self.cc_args, builtin, self.filename, self.filename, DEF_LLVM_EXT)
 
     def exclude_from_build(self, ex_iterable):
         return any(exclude in self.output for exclude in ex_iterable)
@@ -323,6 +328,7 @@ class Engine(object):
         self.arch = args.arch
         self.clang_path = args.clang
         self.declare_dso = declare_dso
+        self.isystem = args.isystem
         self._select_command_type(args)
 
     def _select_command_type(self, args):
@@ -344,7 +350,7 @@ class Engine(object):
         return self.build_llvms(cc_command)
 
     def build_llvms(self, cc_command):
-        clang_command = self.Command(cc_command, self.arch, self.clang_path)
+        clang_command = self.Command(cc_command, self.arch, self.clang_path, self.isystem)
         if not clang_command.valid:
             return
         logging.debug("Compile command: " + cc_command)
