@@ -85,6 +85,8 @@ def get_args():
                             'write enriched call_graph as <original pickle file>.ftrace')
     build_args.add_argument('--fast_build', '-fb', action='store_true',
                             help='Enable to quick build without recompiling sources (reuse existing llvm files)')
+    build_args.add_argument('--isystem', choices=['auto', 'none'], default='none',
+                            help='Detect system include path (defaults to "none")')
 
     # Search arguments
     search_args = parser.add_argument_group('Search arguments')
