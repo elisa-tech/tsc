@@ -209,7 +209,7 @@ class ClangCommand(object):
 
     def _turn_of_optimizations(self):
         # turn off function inlining
-        optim_flags = ['-O1', '-O2', '-O3', '-Ofast', '-Os', '-Oz', '-Og', '-O', '-O4']
+        optim_flags = ['-O1', '-O2', '-O3', '-Ofast', '-Os', '-Oz', '-Og', '-O4']
         for of in optim_flags:
             self.command = self.command.replace(of, '')
 
@@ -262,7 +262,7 @@ class ClangLL(ClangCommand):
 
 class ClangKernelC(ClangCommand):
     def _extract_params(self):
-        m = re.search(r'gcc\s+(?P<cc_args>.+?)-c -o (?P<output>.+?\.o) (?P<filename>.+\.c)', self.command)
+        m = re.search(r'gcc\S*\s+(?P<cc_args>.+?)-c -o (?P<output>.+?\.o) (?P<filename>.+\.c)', self.command)
         if m:
             self.cc_args = m.group('cc_args')
             self.output = m.group('output')
