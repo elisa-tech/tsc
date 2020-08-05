@@ -5,7 +5,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 -->
 
 # Setup example: Ubuntu 18.04.4
-These are instructions for how to setup callgraph on Ubuntu 18.04.4. In addition, it includes some typical example uses of the callgraph tool.
+These are instructions for how to setup callgraph on Ubuntu 18.04.4. In addition, it includes some common example uses of the callgraph tool.
 
 ## Getting Started
 Checkout callgraph:
@@ -67,6 +67,7 @@ Once the database is generated, it can be used to query and visualize function c
 
 As an example, to query callgraph starting from function `__x64_sys_close` with max depth of four function calls, you would run:
 ```
+cd $CG_DIR
 ./callgraph-tool.py --db $CG_DIR/db.pickle --graph __x64_sys_close --depth 4
 ```
 By default, the output is in textual format:
@@ -78,6 +79,7 @@ __x64_sys_close -> __se_sys_close
 ```
 To view the same graph visually, add `--view` argument to the command:
 ```
+cd $CG_DIR
 ./callgraph-tool.py --db $CG_DIR/db.pickle --graph __x64_sys_close --depth 4 --view
 ```
 Which outputs the callgraph as an image:
