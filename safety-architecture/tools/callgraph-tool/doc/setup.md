@@ -84,3 +84,12 @@ cd $CG_DIR
 ```
 Which outputs the callgraph as an image:
 <img src=sys_close.png width="900">
+
+## Converting callgraph database to CSV
+To inspect the contents of callgraph database in textual format, you might want to convert the database to CSV. As an example, to convert the `$CG_DIR/db.pickle` to CSV file, you would run:
+```
+cd $CG_DIR
+./convert_db.py --out $CG_DIR/db.csv $CG_DIR/db.pickle
+```
+
+The resulting CSV database is stored int `CG_DIR/db.csv`.

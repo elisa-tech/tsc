@@ -12,6 +12,8 @@ Call Graph is tool for studying call graphs between different function calling p
 
 
 ## Prerequisites
+For detailed setup and usage instructions on Ubuntu, see [setup: Ubuntu](doc/setup.md).
+
 ```
 pip install -r requirements.txt
 ```
@@ -168,7 +170,7 @@ Only one instance of server is allowed on the system at the same time.
 
 
 ## Settings file
-For reproducibility purposes, it can be more convenient to use settings file than command line arguments. This way the environment setup can be more easily and realiably shared between the developers/users. Callgraph tool supports using the settings file in JSON format to achieve this. 
+For reproducibility purposes, it can be more convenient to use settings file than command line arguments. This way the environment setup can be more easily and reliably shared between the developers/users. Callgraph tool supports using the settings file in JSON format to achieve this. 
 ```
 callgraph-tool.py -f settings.json
 ```
