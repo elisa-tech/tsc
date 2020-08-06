@@ -209,10 +209,9 @@ def test_callgraph_batch_graph(set_up_test_data):
     assert ret == 0
 
 
-
 def test_callgraph_batch_inverse_graph(set_up_test_data):
     """
-    callgraph-tool.py --db batch/cg_small.pickle --batch_inverse_graph batch/flist_fw.pickle
+    callgraph-tool.py --db batch/cg_small.pickle --batch_inverse_graph batch/flist_bw.pickle
     """
     ret = subprocess.call([CALLGRAPH_PY, "--db", "batch/cg_small.pickle", "--batch_inverse_graph",
                           TEST_FOLDER + "/batch/flist_bw.pickle"], stdout=subprocess.PIPE, cwd=TEST_FOLDER)
