@@ -516,6 +516,10 @@ class Service:
     def batch_get_callers(self, func_records, extended=False):
         call_connections = []
         dropped = []
+        if not extended:
+            cols = ["Callee", "Caller", "Indirect"]
+        else:
+            cols = ["Callee", "File", "Line", "Caller", "Indirect"]
         for record in func_records:
             funcname, *_ = record
             if funcname in self._suppress_from_graph:
@@ -527,14 +531,11 @@ class Service:
                 continue
             callers_of_f = self._inverse_call_graph[f]
             record_slot = []
-            cols = []
             for caller_single in callers_of_f:
                 if not extended:
-                    cols = ["Callee", "Caller", "Indirect"]
                     record_slot.append(
                         (funcname, caller_single, caller_single.indirect))
                 else:
-                    cols = ["Callee", "File", "Line", "Caller", "Indirect"]
                     record_slot.append(
                         record + (caller_single, caller_single.indirect))
             call_connections.extend(record_slot)
