@@ -118,19 +118,39 @@ class Service:
                 self.show_graphviz(args['view_type'])
 
         if args['batch_inverse_graph']:
+            fname = args['batch_inverse_graph']
+            if fname.endswith('.pickle'):
+                with open(fname, 'rb') as stream:
+                    records = pickle.load(stream)
+            elif fname.endswith('.csv'):
+                df = pd.read_csv(fname, header=None)
+                records = df.values.tolist()
+            else:
+                self.functionality_writer(
+                    "Expected file with .csv or .pickle extension")
+                return
+
             self.build_callees(fetch_src_info=False)
-            with open(args['batch_inverse_graph'], 'rb') as stream:
-                records = pickle.load(stream)
-                connected_calls, cols = self.batch_get_callers(records)
-                df = pd.DataFrame.from_records(connected_calls, columns=cols)
-                df.to_csv("connected_calls_inv.csv", index=False)
+            connected_calls, cols = self.batch_get_callers(records)
+            df = pd.DataFrame.from_records(connected_calls, columns=cols)
+            df.to_csv("connected_calls_inv.csv", index=False)
 
         if args['batch_graph']:
-            with open(args['batch_graph'], 'rb') as stream:
-                records = pickle.load(stream)
-                connected_calls, cols = self.batch_get_callees(records)
-                df = pd.DataFrame.from_records(connected_calls, columns=cols)
-                df.to_csv("connected_calls.csv", index=False)
+            fname = args['batch_graph']
+            if fname.endswith('.pickle'):
+                with open(fname, 'rb') as stream:
+                    records = pickle.load(stream)
+            elif fname.endswith('.csv'):
+                df = pd.read_csv(fname, header=None)
+                records = df.values.tolist()
+            else:
+                self.functionality_writer(
+                    "Expected file with .csv or .pickle extension")
+                return
+
+            connected_calls, cols = self.batch_get_callees(records)
+            df = pd.DataFrame.from_records(connected_calls, columns=cols)
+            df.to_csv("connected_calls.csv", index=False)
 
         if args['path']:
             path_from, path_to = map(Function, args['path'].split('..'))

@@ -195,7 +195,7 @@ def test_callgraph_tool_indirect_detect(set_up_test_data):
     assert callee_f7_cb_implement in call_graph[caller_aligned_ops_callback]
 
 
-def test_callgraph_batch_graph(set_up_test_data):
+def test_callgraph_batch_graph_pickle(set_up_test_data):
     """
     callgraph-tool.py --db batch/cg_small.pickle --batch_graph batch/flist_fw.pickle
     """
@@ -209,12 +209,39 @@ def test_callgraph_batch_graph(set_up_test_data):
     assert ret == 0
 
 
-def test_callgraph_batch_inverse_graph(set_up_test_data):
+def test_callgraph_batch_graph_csv(set_up_test_data):
+    """
+    callgraph-tool.py --db batch/cg_small.pickle --batch_graph batch/flist_fw.csv
+    """
+    ret = subprocess.call([CALLGRAPH_PY, "--db", "batch/cg_small.pickle", "--batch_graph",
+                          TEST_FOLDER + "/batch/flist_fw.csv"], stdout=subprocess.PIPE, cwd=TEST_FOLDER)
+    assert ret == 0
+    assert os.path.isfile(TEST_FOLDER + "/connected_calls.csv")
+
+    ret = subprocess.call(["diff", TEST_FOLDER + "/batch/exp_connected_calls.csv",
+                          TEST_FOLDER + "/connected_calls.csv"], stdout=subprocess.PIPE, cwd=TEST_FOLDER)
+    assert ret == 0
+
+
+def test_callgraph_batch_inverse_graph_pickle(set_up_test_data):
     """
     callgraph-tool.py --db batch/cg_small.pickle --batch_inverse_graph batch/flist_bw.pickle
     """
     ret = subprocess.call([CALLGRAPH_PY, "--db", "batch/cg_small.pickle", "--batch_inverse_graph",
                           TEST_FOLDER + "/batch/flist_bw.pickle"], stdout=subprocess.PIPE, cwd=TEST_FOLDER)
+    assert ret == 0
+    assert os.path.isfile(TEST_FOLDER + "/connected_calls_inv.csv")
+    ret = subprocess.call(["diff", TEST_FOLDER + "/batch/exp_connected_calls_inv.csv",
+                          TEST_FOLDER + "/connected_calls_inv.csv"], stdout=subprocess.PIPE, cwd=TEST_FOLDER)
+    assert ret == 0
+
+
+def test_callgraph_batch_inverse_graph_csv(set_up_test_data):
+    """
+    callgraph-tool.py --db batch/cg_small.pickle --batch_inverse_graph batch/flist_bw.csv
+    """
+    ret = subprocess.call([CALLGRAPH_PY, "--db", "batch/cg_small.pickle", "--batch_inverse_graph",
+                          TEST_FOLDER + "/batch/flist_bw.csv"], stdout=subprocess.PIPE, cwd=TEST_FOLDER)
     assert ret == 0
     assert os.path.isfile(TEST_FOLDER + "/connected_calls_inv.csv")
     ret = subprocess.call(["diff", TEST_FOLDER + "/batch/exp_connected_calls_inv.csv",
