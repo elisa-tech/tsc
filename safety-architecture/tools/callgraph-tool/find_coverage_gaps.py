@@ -57,13 +57,13 @@ class CoverageGapFinder():
     def _find_coverage_gap_from_caller(self, caller, depth, call_stack):
         if depth >= self.maxdepth:
             _LOGGER.log(utils.LOG_SPAM, "maxdepth reached, returning")
-            return
+            return 0
         if not caller.caller_function:
             _LOGGER.warn("Missing caller_function: %s" % caller)
-            return
+            return 0
         if not caller.callee_function:
             _LOGGER.warn("Missing callee_function: %s" % caller)
-            return
+            return 0
 
         # Find the caller coverage
         caller_cov = 0
@@ -81,19 +81,25 @@ class CoverageGapFinder():
         depth += 1
         call_stack = "%s ==> '%s'" % (call_stack, caller.callee_function)
 
-        # Output csv row if coverage dropped
-        if callee_cov < caller_cov:
-            self._to_csv_row(
-                caller, caller_cov, callee_cov, depth, call_stack)
-
-        # Find next nodes
+        # Recursively find the functions called by the callee_function
         df = df_regex_filter(
             self.df_calls, 'caller_function', "^%s$" % caller.callee_function)
+        callees = df.shape[0]
         for row in df.itertuples():
-            self._find_coverage_gap_from_caller(
+            ret = self._find_coverage_gap_from_caller(
                 caller=row,
                 depth=depth,
                 call_stack=call_stack)
+            callees += ret
+
+        # Output csv row
+        if callee_cov < 100:
+            self._to_csv_row(
+                caller, caller_cov, callee_cov, depth, call_stack, callees)
+
+        # Return the number of function calls in this subtree
+        # (including duplicate pairs of caller-callee)
+        return callees
 
     def _get_coverage(self, funcname):
         df_cov = self.df_cov[(
@@ -116,13 +122,17 @@ class CoverageGapFinder():
                 "callee_filename",
                 "callee_function",
                 "callee_coverage",
-                "coverage_drop",
-                "call_depth",
+                "callee_subtree_size",
+                "caller_depth",
                 "call_stack",
+                # Number of function calls potentially *not* covered in
+                # the callee subtree. The bigger the value, the more
+                # potential for coverage increase in the callee subtree
+                "callee_coverage_gap" # (1)
             ]
         self.csvwriter.write_arr(header)
 
-    def _to_csv_row(self, caller, caller_cov, callee_cov, depth, call_stack):
+    def _to_csv_row(self, caller, caller_cov, callee_cov, depth, call_stack, callees):
         row = \
             [
                 caller.caller_filename,
@@ -131,9 +141,10 @@ class CoverageGapFinder():
                 caller.callee_filename,
                 caller.callee_function,
                 callee_cov,
-                caller_cov - callee_cov,
+                callees,
                 depth,
                 call_stack,
+                ((100 - callee_cov)/100)*callees  # (1)
             ]
         self.csvwriter.write_arr(row)
 
@@ -175,7 +186,13 @@ def cov_to_number(s):
 
 def getargs():
     desc = "Find coverage gaps based on function call csv database "\
-        "(CALLS) and function coverage file (COVERAGE)."
+        "(CALLS) and function coverage file (COVERAGE). "\
+        "The script finds functions that match the regular "\
+        "expression (CALLER_FUNCTION_REGEX), follows the potential "\
+        "callgraphs starting from those functions, and identifies parts "\
+        "of the callgraph where the potential for coverage improvement is "\
+        "greatest based on the function coverage and the subtree size "\
+        "rooted with the given function call."
 
     epil = "Example: ./%s --calls calls.csv --coverage coverage.csv "\
         "--caller_function_regex "\
