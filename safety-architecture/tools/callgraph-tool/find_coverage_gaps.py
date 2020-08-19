@@ -30,17 +30,21 @@ class CoverageGapFinder():
 
         self.df_cov.columns = self.df_cov.columns.str.lower()
         require_cols = ['function', 'filename', 'percent']
-
         if not all(x in list(self.df_cov.columns.values) for x in require_cols):
-            logging.error(
+            _LOGGER.error(
                 "Coverage file '%s' missing required headers: %s" % (
-                    args['coverage_file'], require_cols))
-            exit()
-        # TODO: is this needed?
-        if self.df_cov.isnull().values.any():
-            logging.error(
-                "Empty values in coverage data: %s" % args['coverage_file'])
-            exit()
+                    csv_coverage, require_cols))
+            exit(1)
+
+        require_cols = [
+            'caller_function', 'callee_function', 'caller_filename', 'callee_filename']
+        self.df_calls.columns = self.df_calls.columns.str.lower()
+        if not all(x in list(self.df_calls.columns.values) for x in require_cols):
+            _LOGGER.error(
+                "Function call database file '%s' missing required headers: %s" % (
+                    csv_calls, require_cols))
+            exit(1)
+
         self._write_header()
 
     def find_coverage_gaps(self, regex):
@@ -66,16 +70,10 @@ class CoverageGapFinder():
             return 0
 
         # Find the caller coverage
-        caller_cov = 0
-        df_caller_cov = self._get_coverage(caller.caller_function)
-        if df_caller_cov is not None:
-            caller_cov = cov_to_number(df_caller_cov['percent'].iloc[0])
+        caller_cov = self._get_coverage(caller.caller_function)
 
         # Find the callee coverage
-        callee_cov = 0
-        df_callee_cov = self._get_coverage(caller.callee_function)
-        if df_callee_cov is not None:
-            callee_cov = cov_to_number(df_callee_cov['percent'].iloc[0])
+        callee_cov = self._get_coverage(caller.callee_function)
 
         # Update depth and call_stack
         depth += 1
@@ -102,16 +100,25 @@ class CoverageGapFinder():
         return callees
 
     def _get_coverage(self, funcname):
+        if not funcname or pd.isna(funcname):
+            _LOGGER.warn(
+                "Invalid function name: %s" % funcname)
+            return 0
         df_cov = self.df_cov[(
             self.df_cov['function'] == funcname)]
         if df_cov.shape[0] <= 0:
             _LOGGER.warn(
                 "Missing coverage info for function: %s" % funcname)
-            return None
+            return 0
         elif df_cov.shape[0] > 1:
             _LOGGER.warn(
                 "Multiple coverage values for function: %s" % funcname)
-        return df_cov.head(1)
+        df_head = df_cov.head(1)
+        if df_head is None:
+            _LOGGER.warn(
+                "Dataframe head(1) returned None for function: %s" % funcname)
+            return 0
+        return cov_to_number(df_head['percent'].iloc[0])
 
     def _write_header(self):
         header = \
@@ -128,7 +135,7 @@ class CoverageGapFinder():
                 # Number of function calls potentially *not* covered in
                 # the callee subtree. The bigger the value, the more
                 # potential for coverage increase in the callee subtree
-                "callee_coverage_gap" # (1)
+                "callee_coverage_gap"  # (1)
             ]
         self.csvwriter.write_arr(header)
 
@@ -144,7 +151,7 @@ class CoverageGapFinder():
                 callees,
                 depth,
                 call_stack,
-                ((100 - callee_cov)/100)*callees  # (1)
+                ((100 - float(callee_cov))/100)*callees  # (1)
             ]
         self.csvwriter.write_arr(row)
 
@@ -214,10 +221,10 @@ def getargs():
         '--maxdepth', nargs='?', help=help, type=check_positive, default=3)
     help = "Set the verbosity level (e.g. -vv for debug level)"
     parser.add_argument(
-        '-v', '--verbose', help=help, action='count', default=0)
-    help = "Set the output file name, default is 'coverage_drops.csv'"
+        '-v', '--verbose', help=help, action='count', default=1)
+    help = "Set the output file name, default is 'coverage_gaps.csv'"
     parser.add_argument(
-        '--out', nargs='?', help=help, default='coverage_drops.csv')
+        '--out', nargs='?', help=help, default='coverage_gaps.csv')
     return parser.parse_args()
 
 
@@ -238,5 +245,6 @@ if __name__ == "__main__":
         maxdepth=args.maxdepth,
         outfile=args.out)
     cov.find_coverage_gaps(args.caller_function_regex)
+
 
 ################################################################################
