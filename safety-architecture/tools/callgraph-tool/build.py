@@ -208,7 +208,7 @@ class ClangCommand(object):
 
     def _convert(self):
         self._remove_unsupported_args()
-        self._turn_of_optimizations()
+        # self._turn_of_optimizations()
         self.valid = self._extract_params()
         if self.valid:
             builtin = self._builtin()
@@ -293,7 +293,7 @@ class ClangKernel(ClangCommand):
         return False
 
     def _convert(self):
-        self._turn_of_optimizations()
+        # self._turn_of_optimizations()
         self.valid = self._extract_params()
         if self.valid:
             builtin = self._builtin()
