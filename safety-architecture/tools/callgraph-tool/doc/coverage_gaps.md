@@ -16,7 +16,7 @@ You also need the code coverage information. The expected format is a CSV file, 
 
 ## Finding Coverage Gaps
 For the sake of example, let's assume we have the following callgraph and the coverage information as shown in the graph:
-<img src=sys_mmap.png width="1000">
+<img src=sys_mmap.png width="1100">
 
 To find functions where the potential for code coverage improvement is greatest, run [find_coverage_gaps.py](../find_coverage_gaps.py) as follows:
 ```
@@ -28,7 +28,7 @@ To find functions where the potential for code coverage improvement is greatest,
   --out sys_mmap_gcov.csv
 ```
 
-The above command runs [find_coverage_gaps.py](../find_coverage_gaps.py) with the specified callgraph database and coverage information (`--calls` and `--coverage`). It finds functions where the function name matches regular expression `^__x64_sys_mmap$` and follows each call chain starting from the matching functions. For each matching call chain, it calculates the coverage gap for all functions in the chain following the caller-callee relations to a point where caller reaches at most `--maxdepth 3` depth. The resulting output is stored in `sys_mmap_gcov.csv`.
+The above command runs [find_coverage_gaps.py](../find_coverage_gaps.py) with the specified callgraph database and coverage information (`--calls` and `--coverage`). It finds functions where the function name matches regular expression `^__x64_sys_mmap$` and follows each call chain starting from the matching functions. For each call chain, it calculates the coverage gap for all functions in the chain following the caller-callee relations to a point where caller reaches at most `--maxdepth 3` depth. The resulting output is stored in `sys_mmap_gcov.csv`.
 
 In the following section, we use the `csvsql` and `csvlook` from the [csvkit](https://csvkit.readthedocs.io/en/latest/index.html) suite to view and query the output data.
 
@@ -55,9 +55,8 @@ csvsql --query \
 
 ```
 
-The five caller-callee pairs are the cases where the callee coverage is not 100% in the example graph. Since the output is ordered descending by callee_coverage_gap, the topmost entry (`fput ==> fput_many`) indicates the callee where the potential for code coverage improvement is greatest. The value of the callee_coverage_gap is based on the coverage, as well as the subtree size rooted to the specific callee function when walking the call chain at most `--maxdepth 3` callers deep. 
+The five caller-callee pairs are the cases where the callee coverage is not 100% in the example graph. Since the output is ordered descending by callee_coverage_gap, the topmost entry (`fput ==> fput_many`) indicates the callee where the potential for code coverage improvement is greatest. The value of the callee_coverage_gap is based on the coverage, as well as the subtree size rooted to the specific callee function considering the call chain at most `--maxdepth 3` callers deep. 
 
-For instance, the last entry (`ksys_mmap_pgoff ==> __audit_mmap_fd`) callee_coverage_gap is zero even though the coverage is worse (0%) than the coverage for the first entry (72.73%). The reason is that `__audit_mmap_fd` is a at the end of the call chain so possible coverage improvement would not lead to coverage improvements in any new subtrees. Conversely, the first entry callee `fput_many` is associated to subtree with three nodes. Therefore, the impact of possible coverage improvement for callee `fput_many` is potentially  bigger considering the overall coverage.
+For instance, the last entry (`ksys_mmap_pgoff ==> __audit_mmap_fd`) callee_coverage_gap is zero even though the coverage is worse (0%) than the coverage for the first entry (72.73%). The reason is that `__audit_mmap_fd` is a at the end of the call chain so possible coverage improvement would not lead to coverage improvements in any new subtrees. Conversely, the first entry callee for the first entry on the above table `fput_many` is associated to subtree with three nodes. Therefore, the impact of possible coverage improvement for callee `fput_many` is potentially bigger considering the overall coverage.
 
 Notice the output also contains the full call stack starting from the function that initially matched the regular expression `^__x64_sys_mmap$`, making it easier to navigate the call chain considered in the calculation.
-

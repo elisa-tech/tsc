@@ -93,7 +93,7 @@ class CoverageGapFinder():
         # Output csv row
         if callee_cov < 100:
             self._to_csv_row(
-                caller, caller_cov, callee_cov, depth, call_stack, callees)
+                caller, caller_cov, callee_cov, call_stack, callees)
 
         # Return the number of function calls in this subtree
         # (including duplicate pairs of caller-callee)
@@ -130,7 +130,6 @@ class CoverageGapFinder():
                 "callee_function",
                 "callee_coverage",
                 "callee_subtree_size",
-                "caller_depth",
                 "call_stack",
                 # Number of function calls potentially *not* covered in
                 # the callee subtree. The bigger the value, the more
@@ -139,7 +138,7 @@ class CoverageGapFinder():
             ]
         self.csvwriter.write_arr(header)
 
-    def _to_csv_row(self, caller, caller_cov, callee_cov, depth, call_stack, callees):
+    def _to_csv_row(self, caller, caller_cov, callee_cov, call_stack, callees):
         row = \
             [
                 caller.caller_filename,
@@ -149,7 +148,6 @@ class CoverageGapFinder():
                 caller.callee_function,
                 callee_cov,
                 callees,
-                depth,
                 call_stack,
                 ((100 - float(callee_cov))/100)*callees  # (1)
             ]
