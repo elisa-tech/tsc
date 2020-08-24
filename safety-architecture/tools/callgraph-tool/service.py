@@ -311,13 +311,8 @@ class Service:
             self._dot_source += self.add_node_for_function(function, function.line_numbers,
                                                            view_base_dir=view_base_dir)
             for callee in callees:
-                if callee.args:
-                    self._dot_source += self.add_connection(function, callee, color="blue",
-                                                            view_base_dir=view_base_dir,
-                                                            line_number=callee.line_numbers)
-                else:
-                    self._dot_source += self.add_connection(function, callee, view_base_dir=view_base_dir,
-                                                            line_number=callee.line_numbers)
+                self._dot_source += self.add_connection(function, callee, view_base_dir=view_base_dir,
+                                                        line_number=callee.line_numbers)
                 style = 'solid'
                 if callee.indirect:
                     style = 'dashed'
@@ -371,14 +366,9 @@ class Service:
             self._dot_source += self.add_node_for_function(
                 function, line_numbers, view_base_dir=view_base_dir)
             for caller in callers:
-                if caller.args:
-                    self._dot_source += self.add_connection(function, caller, color="blue", direction="back",
-                                                            view_base_dir=view_base_dir,
-                                                            line_number=caller.line_numbers)
-                else:
-                    self._dot_source += self.add_connection(function, caller, direction="back",
-                                                            view_base_dir=view_base_dir,
-                                                            line_number=caller.line_numbers)
+                self._dot_source += self.add_connection(function, caller, direction="back",
+                                                        view_base_dir=view_base_dir,
+                                                        line_number=caller.line_numbers)
                 style = 'solid'
                 if caller.indirect:
                     style = 'dashed'
