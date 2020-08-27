@@ -11,6 +11,7 @@ import logging
 import graphviz as gv
 import pandas as pd
 import utils
+from collections import OrderedDict
 
 _LOGGER = logging.getLogger(utils.LOGGER_NAME)
 
@@ -23,6 +24,8 @@ class Grapher():
         self.df = df_from_csv_file(csvfile)
         self.digraph = None
         self.maxdepth = 1
+        # Key: node name, Value: list of labels associated to node name
+        self.nodelabels = {}
 
     def graph_caller_function(
             self,
@@ -52,18 +55,15 @@ class Grapher():
             return
         df = self._regex_filter(col, regex)
         for row in df.itertuples():
+            # Caller node
+            self._add_node(row.caller_function, row.caller_filename)
+            # Callee node
+            self._add_node(row.callee_function, row.callee_filename)
+            # Edge
+            self.digraph.edge(row.caller_function, row.callee_function)
             if inverse:
-                self.digraph.edge(
-                    "%s\n%s" % (row.caller_function, row.caller_filename),
-                    "%s\n%s" % (row.callee_function, row.callee_filename),
-                )
                 self._graph(col, r'^%s$' % row.caller_function, curr_depth)
-
             else:
-                self.digraph.edge(
-                    "%s\n%s" % (row.caller_function, row.caller_filename),
-                    "%s\n%s" % (row.callee_function, row.callee_filename),
-                )
                 self._graph(col, r'^%s$' % row.callee_function, curr_depth)
 
     def _render(self, filename, format):
@@ -73,6 +73,23 @@ class Grapher():
 
     def _regex_filter(self, col, regex):
         return self.df[self.df[col].str.contains(regex, regex=True, na=False)]
+
+    def _add_node(self, function, filename):
+        function = str(function)
+        filename = str(filename)
+        # Node name = function, Default label = []
+        labels = self.nodelabels.setdefault(function, [])
+        # Add filename as new label
+        labels.append(filename)
+        # Remove possible duplicate labels, preserving order
+        labels = list(OrderedDict.fromkeys(labels))
+        # Build the html label: function name on the first line followed by
+        # associated filenames framed with html font-tags
+        beg = "<FONT POINT-SIZE=\"10\">"
+        end = "</FONT>"
+        label = "<%s<BR/>%s%s%s>" % (function, beg, "<BR/>".join(labels), end)
+        # Add node to the graph
+        self.digraph.node(function, label)
 
 
 ################################################################################
