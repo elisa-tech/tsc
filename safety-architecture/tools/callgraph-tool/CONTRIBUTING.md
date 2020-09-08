@@ -5,22 +5,57 @@ SPDX-License-Identifier: Apache-2.0
 -->
 
 # Contributing to Callgraph Tool
-We appreciate your input! 
+We appreciate your input! If you want to contribute to the project send us a pull request following the guidelines in this document.
 
 ## We Develop with Github
-We use github to host code, to track issues and feature requests, as well as accept pull requests.
+We use github to host code, to track issues and feature requests, as well as accept pull requests. 
+Updating and extending docs as well as adding new tests is a good way to start contributing the project.
+[The issues tracker](https://github.com/elisa-tech/workgroups/labels/callgraph-tool) contains some problems that are worth considering. Feel free
+to start the discussion on any of the unassigned issues to clarify the high-level approach.
 
-Pull requests are the best way to propose changes to the codebase (we use [Github Flow](https://guides.github.com/introduction/flow/index.html)). 
+## Pull requests
+
+Pull requests are the best way to get the proposed changes into the codebase (we use [Github Flow](https://guides.github.com/introduction/flow/index.html)). 
 Follow the checklists bellow:
 
-1. Fork the repo and create your branch from `master`.
-2. If you've added code that should be tested, add tests.
-3. If you've changed APIs, update the documentation.
-4. Ensure the test suite passes.
-5. Issue that pull request!
+
+1. Go to project home [page](https://github.com/elisa-tech/workgroups) and click the `Fork` button in the top-right corner. This will create
+a `https://github.com/YOUR_GITHUB_USERNAME/workgroups` repository.
+
+2. Checkout main repository into your working directory: 
+
+```
+cd $WORKDIR
+git clone https://github.com/elisa-tech/workgroups.git
+```
+
+3. Add the fork as an additional origin:
+
+```
+git remote add my-origin https://github.com/YOUR_GITHUB_USERNAME/workgroups.git
+git fetch my-origin
+git checkout -b dev-branch my-origin/master
+```
+
+4. Develop the feature or fix a bug:
+* If you've added code that should be tested, add tests.
+* If you've changed APIs, update the documentation.
+* Ensure the test suite passes.
+* Ensure that you are in sync with the master branch
+* Push the changes in your remote branch
+
+5. Go to https://github.com/elisa-tech/workgroups. There should be a green `Compare & pull request` button. Use it to crate a pull request.
+
+6. Wait for a review and acknowledge the possible comments.
+
+## Commits
+
+Commit messages should contain of short one-line description, optionally followed by an empty line and more verbose description. All the commits must be
+signed. Use `git commit -s -m COMMIT_MESSAGE` to add a signature to your commit.
 
 ## Report bugs using Github's [issues](https://github.com/elisa-tech/workgroups/issues)
 We use GitHub issues to track public bugs. Report a bug by [opening a new issue]()!
+The title of the issue should start with CG: and contain callgraph-tool label.
 
 ## Write bug reports with detail, background, and sample code
 
