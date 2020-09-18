@@ -105,10 +105,11 @@ def build_call_graph(args, call_graph):
     tmp_dso_declare = manager.list()
 
     with open(args.build[0], "r") as ins:
+        dbase = json.load(ins)
         try:
             pool = multiprocessing.Pool(multiprocessing.cpu_count())
             engine = Engine(indirect_nodes, call_graph_lock, tmp_call_graph, tmp_dso_declare, args)
-            pool.map(engine, ins)
+            pool.map(engine, dbase)
         finally:  # To make sure processes are closed in the end, even if errors happen
             pool.close()
             pool.join()
@@ -139,7 +140,7 @@ def convert(build_log, build_log_format, temp_file):
                     if fname.endswith(ext):
                         ll_files.append(os.path.join(root, fname))
                         break
-        temp_file.write('\n'.join(ll_files))
+        json.dump(ll_files, temp_file)
         return True, '.'
 
     raise ValueError("Not implemented log format: " + str(build_log_format))
@@ -178,10 +179,13 @@ def get_unsupported_arguments_mips():
     return unsupported_arguments
 
 
-def mips_modifications(cc_command):
-    cc_command = cc_command.replace('-march=mips64r6', '-target mips64el')
-    cc_command = cc_command.replace('-D__KERNEL__', '-D__KERNEL__ -D__linux__')
-    return cc_command
+def mips_modifications(cc_args):
+    d = {'-march=mips64r6': '-target mips64el', '-D__KERNEL__': '-D__KERNEL__ -D__linux__'}
+    for k, v in d:
+        if k in cc_args:
+            idx_k = cc_args.index(k)
+            cc_args[idx_k] = v
+    return cc_args
 
 
 class ClangCommand(object):
@@ -207,13 +211,7 @@ class ClangCommand(object):
         return builtin
 
     def _convert(self):
-        self._remove_unsupported_args()
-        # self._turn_of_optimizations()
-        self.valid = self._extract_params()
-        if self.valid:
-            builtin = self._builtin()
-            self.command = "%s %s -g %s -S -emit-llvm %s -o %s%s" % (
-                    self.clang_path, self.cc_args, builtin, self.filename, self.filename, DEF_LLVM_EXT)
+        pass
 
     def _turn_of_optimizations(self):
         # turn off function inlining
@@ -224,12 +222,14 @@ class ClangCommand(object):
     def _remove_unsupported_args(self):
         unsupported_arguments = get_unsupported_arguments_x86()
         for arg in unsupported_arguments:
-            self.command = self.command.replace(arg, '')
+            if arg in self.cc_args:
+                self.cc_args.remove(arg)
         if self.arch == 'mips':
             unsupported_arguments = get_unsupported_arguments_mips()
             for arg in unsupported_arguments:
-                self.command = self.command.replace(arg, '')
-            self.command = mips_modifications(self.command)
+                if arg in self.cc_args:
+                    self.cc_args.remove(arg)
+            self.cc_args = mips_modifications(self.cc_args)
 
     def translation_unit(self):
         return "%s%s" % (self.filename, DEF_LLVM_EXT)
@@ -270,13 +270,26 @@ class ClangLL(ClangCommand):
 
 class ClangKernelC(ClangCommand):
     def _extract_params(self):
-        m = re.search(r'gcc\S*\s+(?P<cc_args>.+?)-c -o (?P<output>.+?\.o) (?P<filename>.+\.c)', self.command)
-        if m:
-            self.cc_args = m.group('cc_args')
-            self.output = m.group('output')
-            self.filename = m.group('filename')
-            return True
-        return False
+        self.filename = os.path.join(self.command['directory'], self.command['file'])
+        # remove compiler and file - always at the first position
+        self.command['arguments'] = self.command['arguments'][1:-1]
+        self.command['arguments'].remove('-c')
+        idx_o = self.command['arguments'].index('-o')
+        self.command['arguments'].remove('-o')
+        self.output = self.command['arguments'].pop(idx_o)
+        self.cc_args = " ".join(self.command['arguments'])
+        return True
+
+    def _convert(self):
+        # self._turn_of_optimizations()
+        if 'command' in self.command:
+            self.command['arguments'] = self.command['command'].split(" ")
+        self.valid = self._extract_params()
+        self._remove_unsupported_args()
+        if self.valid:
+            builtin = self._builtin()
+            self.command = "%s %s -g %s -S -emit-llvm %s -o %s%s" % (
+                    self.clang_path, self.cc_args, builtin, self.filename, self.filename, DEF_LLVM_EXT)
 
     def exclude_from_build(self, ex_iterable):
         return any(exclude in self.output for exclude in ex_iterable)
@@ -284,16 +297,21 @@ class ClangKernelC(ClangCommand):
 
 class ClangKernel(ClangCommand):
     def _extract_params(self):
-        m = re.search(r'clang\S*\s+(?P<cc_args>.+?)-c -o (?P<output>.+?\.o) (?P<filename>.+\.c)', self.command)
-        if m:
-            self.cc_args = m.group('cc_args')
-            self.output = m.group('output')
-            self.filename = m.group('filename')
-            return True
-        return False
+        self.filename = os.path.join(self.command['directory'], self.command['file'])
+        # remove compiler and file - always at the first position
+        self.command['arguments'] = self.command['arguments'][1:-1]
+        self.command['arguments'].remove('-c')
+        idx_o = self.command['arguments'].index('-o')
+        self.command['arguments'].remove('-o')
+        self.output = self.command['arguments'].pop(idx_o)
+        self.cc_args = " ".join(self.command['arguments'])
+        return True
 
     def _convert(self):
         # self._turn_of_optimizations()
+        if 'command' in self.command:
+            self.command['arguments'] = self.command['command'].split(" ")
+#        self.command = self.command.replace('\\"', '')
         self.valid = self._extract_params()
         if self.valid:
             builtin = self._builtin()
@@ -353,7 +371,8 @@ class Engine(object):
         clang_command = self.Command(cc_command, self.arch, self.clang_path, self.isystem)
         if not clang_command.valid:
             return
-        logging.debug("Compile command: " + cc_command)
+        print(clang_command.command)
+        logging.debug("Compile command: " + clang_command.command)
         # Ignore files/directories listed in build_exclude
         if clang_command.exclude_from_build(self.build_exclude):
             return
@@ -365,5 +384,3 @@ class Engine(object):
         if success:
             with open(translation_unit, 'r') as stream:
                 parse_llvm(stream, self.call_graph, self.call_graph_lock, self.indirect_nodes, self.declare_dso)
-
-        logging.debug("Clang command: " + str(clang_command))
