@@ -48,27 +48,28 @@ Default option is _kernel\_c_. The instructions in this document assume the defa
 1. Collect verbose build log for Linux kernel like so:
 ```
 make defconfig
-make -j `nproc` V=1 &> buildlog.txt
+make -j `nproc`
+./scripts/gen_compile_commands.py
 ```
 
 2. Still executing from kernel root, feed build log to callgraph-tool (this option uses system clang):
 ```
-callgraph-tool.py --build ./buildlog.txt
+callgraph-tool.py --build compile_commands.json
 ```
 
 In order to use custom clang build, user can specify the path to the executable binary so that the callgraph-tool will use this instead of the default clang
 version on the system: 
 
 ```
-callgraph-tool.py --build buildlog.txt --clang $HOME/llvm-project/build/bin/clang-10
+callgraph-tool.py --build compile_commands.json --clang $HOME/llvm-project/build/bin/clang-10
 ```
 The output is stored in the file call_graph.pickle (name can be user specified via --db option).
 
 _Support for different architectures:_
-Callgraph can analyse buildlog for different target architectures. Currently, the supported versions are 'x86', which is a default, and 'mips'. The
+Callgraph can analyse build log for different target architectures. Currently, the supported versions are 'x86', which is a default, and 'mips'. The
 appropriate architecture can be selected using --arch command line option. When using mips option, it is recommended to use the newest clang version, i.e.
 ```
-callgraph-tool.py --build buildlogmips.txt --arch mips --clang $HOME/llvm-project/build/bin/clang-10
+callgraph-tool.py --build mips_compile_commands.json --arch mips --clang $HOME/llvm-project/build/bin/clang-10
 ```
 Setting up the cross-compiling environment is out of scope of this documentation.
 
