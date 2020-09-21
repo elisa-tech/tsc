@@ -76,11 +76,11 @@ def check_trigger_map(cplusplus=False):
 
 def test_callgraph_tool_build(set_up_test_data):
     """
-    callgraph-tool.py --build buildlog.txt
+    callgraph-tool.py --build compile_commands.json
     """
-    ret = subprocess.call([CALLGRAPH_PY, "--config", "configuration.yaml",
-                          "--db", "out_call_graph.pickle", "--trgdb", "out_trigger_call_map.pickle", "--build",
-                           "buildlog.txt", "--build_trigger_map", "--fast_build", "--build_exclude", "exclude"],
+    ret = subprocess.call([CALLGRAPH_PY, "--config", "configuration.yaml", "--db", "out_call_graph.pickle",
+                           "--trgdb", "out_trigger_call_map.pickle", "--build", "compile_commands.json",
+                           "--build_trigger_map", "--fast_build", "--build_exclude", "exclude"],
                           stdout=subprocess.PIPE, cwd=ROOT_FOLDER + "/callgraph_tool_test_data")
     assert ret == 0
 

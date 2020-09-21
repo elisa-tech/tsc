@@ -34,30 +34,28 @@ This approach is very similar to the KERNEL_C option. The following patch needs 
  # SC2191: The = here is literal. To assign by index, use ( [index]=value ) with no spaces. To keep as literal, quote it.
  # shellcheck disable=SC2191
 -MAKE=( make -j"$(nproc)" -s CC=clang O=out )
-+MAKE=( make -j"$(nproc)" V=1 CC=clang O=out )
++MAKE=( make -j"$(nproc)" CC=clang O=out )
   
  set -x
 ```
 After that, the build log is simply collected with the following command (from the tc-build/kernel directory):
 ```
-./build.sh -t X86 &> buildlog.txt 
+./build.sh -t X86
+./scripts/gen_compile_commands.py
 ```
 
 Once the compilation is complete, we can proceed with the creation of the call_graph.pickle database. By default, the build folder is called out, so we run the following command from the tc-build/kernel/linux-5.5/out directory:
 ```
-$PATH_TO_CGTOOL/callgraph-tool.py --build buildlog.txt \
+$PATH_TO_CGTOOL/callgraph-tool.py --build compile_commands.json \
                                   --build_log_format kernel_clang \
                                   --clang $HOME/ClangBuiltLinux/tc-build/build/llvm/stage2/bin/clang-11
 ```
 The --build_log_format command line option needs to be set to kernel_clang value. In this example Clang (version 11) was built with llvm-build.py script provided in ClangBuiltLinux. In the callgraph tool this log is parsed to find the compilation commands, rerun them with optimizations turned off and to emit the LLVM IR files. From this point on, files are further processed to extract the required function information in a same manner as with KERNEL_C option.
 
 
-### LL_CLANG
+### 
 
-In comparison to the previous approaches, LL_CLANG does not require capturing the build logs but it assumes the existence of previously generated .ll (or .llvm) files in the build folder. For the Linux project it is possible to tweak script/Makefiles.build in order
-to produce intermediate files as a side-effect of the compilation process. 
-The advantage of this approach is that it can be used to build call graph for any project for which we are able to produce the IR files.
-Example command to create the call graph database is:
+LL_CLANG In comparison to the previous approaches, LL_CLANG does not require capturing the build logs but it assumes the existence of previously generated .ll (or .llvm) files in the build folder. For the Linux project it is possible to tweak script/Makefiles.build in order to produce intermediate files as a side-effect of the compilation process.  The advantage of this approach is that it can be used to build call graph for any project for which we are able to produce the IR files.  Example command to create the call graph database is:
 ```
 $PATH_TO_CGTOOL/callgraph-tool.py --build $HOME/ClangBuiltLinux/tc-build/kernel/linux-5.5/out \
                                   --build_log_format ll_clang
