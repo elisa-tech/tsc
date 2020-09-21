@@ -11,9 +11,7 @@ import sys
 import logging
 import pandas as pd
 
-sys.path.insert(0, os.path.abspath(
-    os.path.join(os.path.dirname(__file__), 'clang_indexer')))
-import utils  # noqa
+import utils
 
 _LOGGER = logging.getLogger(utils.LOGGER_NAME)
 
@@ -149,7 +147,7 @@ class CoverageGapFinder():
                 callee_cov,
                 callees,
                 call_stack,
-                ((100 - float(callee_cov))/100)*callees  # (1)
+                ((100 - float(callee_cov)) / 100) * callees  # (1)
             ]
         self.csvwriter.write_arr(row)
 

@@ -1,20 +1,9 @@
-# SPDX-FileCopyrightText: 2020 Bayerische Motoren Werke Aktiengesellschaft (BMW AG)
-#
-# SPDX-License-Identifier: 	Apache-2.0
-
-
-asciitree
-clang
-colorama
-colorlog
-pandas
-pyro4
-pyyaml
+wllvm
 wget
-# TODO: to requirements-dev.txt:
+colorlog
+
+# dev requirements:
 pycodestyle
 pytest
 pytest-cov
-reuse
-IPython
-graphviz
+pandas

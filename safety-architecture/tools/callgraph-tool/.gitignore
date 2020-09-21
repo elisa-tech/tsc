@@ -2,9 +2,12 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-index.pickle
+clang/
+temp/
 env/
 venv/
+build/
 **/.vscode
 __pycache__/
 *.py[cod]
+*.csv
