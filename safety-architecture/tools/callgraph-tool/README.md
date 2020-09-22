@@ -15,7 +15,7 @@ CG_DIR=$(pwd)/workgroups/safety-architecture/tools/callgraph-tool
 
 Install the following requirements:
 ```
-sudo apt install python3 python3-pip build-essential cmake libstdc++-8-dev clang-10 python3-clang-10
+sudo apt install python3 python3-pip build-essential cmake libstdc++-8-dev clang-10 python3-clang-10 llvm-10 llvm-10-dev
 ```
 
 In addition, the scripts rely on python packages specified in requirements.txt. You can install the required packages with:
