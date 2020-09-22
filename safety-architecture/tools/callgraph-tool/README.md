@@ -15,7 +15,7 @@ CG_DIR=$(pwd)/workgroups/safety-architecture/tools/callgraph-tool
 
 Install the following requirements:
 ```
-sudo apt install python3 python3-pip build-essential cmake libstdc++-8-dev
+sudo apt install python3 python3-pip build-essential cmake libstdc++-8-dev clang-10 python3-clang-10
 ```
 
 In addition, the scripts rely on python packages specified in requirements.txt. You can install the required packages with:
@@ -33,12 +33,6 @@ KERNEL=$(pwd)/linux
 
 ## Generating callgraph database
 To make use of the tool, you first need to generate callgraph database relevant for your kernel source tree and build configuration.
-
-#### Download Clang
-```
-cd $CG_DIR
-./scripts/clang_download.py --out ./clang
-```
 
 #### Build the crix-callgraph tool
 We are going to use crix-callgraph to build the callgraph database. Crix-callgraph is based on the callgraph code from the [crix](https://github.com/umnsec/crix) program. The tool was build on top of crix version: https://github.com/umnsec/crix/commit/13d3e5574aaaae07d93ae5d1fc5f46c9487992ba.

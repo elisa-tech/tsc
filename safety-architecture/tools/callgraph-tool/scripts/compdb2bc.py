@@ -119,15 +119,15 @@ def command_line_args(scriptdir):
     required_named.add_argument('--compdb', help=help, required=True)
 
     help = "File path to libclang dynamic library (libclang.so)"
-    path = os.path.join(scriptdir, 'clang/bin/lib/libclang.so')
+    path = os.path.join(scriptdir, '/usr/lib/llvm-10/lib/libclang.so')
     parser.add_argument('--libclang', help=help, default=path)
 
     help = "File path to libclang python bindings (cindex.py)"
-    path = os.path.join(scriptdir, 'clang/src/bindings/python/clang/cindex.py')
+    path = os.path.join(scriptdir, '/usr/lib/python3/dist-packages/clang/cindex.py')
     parser.add_argument('--cindexpy', help=help, default=path)
 
     help = "File path to clang binary"
-    path = os.path.join(scriptdir, 'clang/bin/bin/clang')
+    path = os.path.join(scriptdir, '/usr/lib/llvm-10/bin/clang')
     parser.add_argument('--clang', help=help, default=path)
 
     help = "Set the verbose level (defaults to --v=1)"
