@@ -1,7 +1,8 @@
 SHELL := /bin/bash
-LLVM_DIR := /usr/lib/llvm-10/
+LLVM_DIR := /usr/lib/llvm-10
 CRIXCG_SRC_DIR := ${CURDIR}/src
 CRIXCG_BUILD_DIR := ${CURDIR}/build
+PATH := $(LLVM_DIR)/bin:$(PATH)
 
 UNAME := $(shell uname)
 ifeq ($(UNAME), Linux)
@@ -13,7 +14,7 @@ endif
 build_analyzer_func = \
 	(mkdir -p ${2} \
 		&& cd ${2} \
-		&& PATH=${LLVM_DIR}/bin:${PATH} \
+		&&  PATH=${PATH} \
 			LLVM_TOOLS_BINARY_DIR=${LLVM_DIR}/bin \
 			LLVM_LIBRARY_DIRS=${LLVM_DIR}/lib \
 			LLVM_INCLUDE_DIRS=${LLVM_DIR}/include \

@@ -5,7 +5,7 @@ INC     = -I./
 #  = means expand whenever used
 # := means expand once
 SHELL := /bin/bash
-CLANG_BIN_DIR := ../../clang/bin/bin
+CLANG_BIN_DIR := /usr/lib/llvm-10/bin
 CG_BIN := ../../build/lib/crix-callgraph
 PATH := $(CLANG_BIN_DIR):$(PATH)
 

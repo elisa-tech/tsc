@@ -35,11 +35,14 @@ matrix:
       dist: bionic
       addons:
           apt:
-              sources:
-                  - ubuntu-toolchain-r-test
               packages:
-                  - libstdc++6
-                  - bear
+                  - build-essential
+                  - cmake
+                  - libstdc++-8-dev
+                  - clang-10
+                  - python3-clang-10
+                  - llvm-10
+                  - llvm-10-dev
       python:
         - "3.6"
       before_install:
@@ -48,7 +51,6 @@ matrix:
         - make install-requirements
       script:
         - make pre-push
-        - make clang-indexer
 
     # Sub-dir safety-architecture/tools/callgraph-tool
     # Python version: 3.7
@@ -56,11 +58,14 @@ matrix:
       dist: bionic
       addons:
           apt:
-              sources:
-                  - ubuntu-toolchain-r-test
               packages:
-                  - libstdc++6
-                  - bear
+                  - build-essential
+                  - cmake
+                  - libstdc++-8-dev
+                  - clang-10
+                  - python3-clang-10
+                  - llvm-10
+                  - llvm-10-dev
       python:
         - "3.7"
       before_install:
@@ -69,4 +74,3 @@ matrix:
         - make install-requirements
       script:
         - make pre-push
-        - make clang-indexer
