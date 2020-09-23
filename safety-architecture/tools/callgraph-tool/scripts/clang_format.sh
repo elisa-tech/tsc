@@ -50,9 +50,7 @@ done
 
 warn=false; 
 apply=false
-
-# Default style is LLVM
-style=LLVM
+style=none
 
 # Parse short options
 OPTIND=1
@@ -78,17 +76,25 @@ if [ "$apply" == "false" ]; then
     warn=true
 fi
 
+# Default style is LLVM
+# For other pre-configured styles, see:
+# https://clang.llvm.org/docs/ClangFormatStyleOptions.html#configurable-format-style-options
+# and https://zed0.co.uk/clang-format-configurator/
+if [ "$style" == "none" ]; then
+    style=LLVM
+fi
+
 CPP_FILES_REGEX='.*\.\(cc\|h\)'
 CPP_SRC_DIR='src/'
 fail=false
 
 for cppfile in $(find $CPP_SRC_DIR -regex $CPP_FILES_REGEX); do
-    diff_ret=$(diff -u $cppfile <(clang-format -style=LLVM $cppfile) | tee /dev/tty)
+    diff_ret=$(diff -u $cppfile <(clang-format -style=$style $cppfile) | tee /dev/tty)
     if [ ! -z "$diff_ret" ] && [ "$warn" == "true" ]; then 
         fail=true
     fi
     if [ "$apply" == "true" ]; then
-        clang-format -style=LLVM -i $cppfile
+        clang-format -style=$style -i $cppfile
     fi
 done
 
