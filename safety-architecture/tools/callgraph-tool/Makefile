@@ -65,11 +65,14 @@ test: crix-callgraph ## Build and run tests
 	pytest -vx tests/
 	$(call target_success,$@)
 
-style-pyc: # Check with pycodestyle
+style-pyc: ## Check with pycodestyle
 	pycodestyle --max-line-length 95 --exclude='venv/','clang/','temp/' .
 	$(call target_success,$@)
 
-style: style-pyc # Check style
+style-cpp: ## Check with clang-format
+	scripts/clang_format.sh --warn --style LLVM
+
+style: style-pyc ## Check style
 
 crix-callgraph: llvm-check ## Build crix-callgraph
 	$(call build_analyzer_func, ${CRIXCG_SRC_DIR}, ${CRIXCG_BUILD_DIR})
