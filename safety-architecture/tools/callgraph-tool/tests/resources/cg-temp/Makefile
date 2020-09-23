@@ -50,7 +50,7 @@ bcfiles: $(BC)
 	@$(LL_CC) $(LL_FLAGS) $(CFLAGS) -o $@ $<
 
 %.bc: %.c
-	@$(BC_CC) $(LL_FLAGS) $(CFLAGS) -o $@ $<
+	@$(BC_CC) $(BC_FLAGS) $(CFLAGS) -o $@ $<
 
 
 clean:

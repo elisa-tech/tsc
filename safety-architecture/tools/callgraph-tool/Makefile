@@ -24,8 +24,13 @@ build_analyzer_func = \
 				-DLLVM_ENABLE_ASSERTIONS=ON \
 				-DCMAKE_CXX_FLAGS_RELEASE="-std=c++14 -fno-rtti -fpic -g -Wall" && make -j${NPROC})
 
+GREEN := \033[32m
+RED := \033[31m
+YELLOW := \033[33m
+NC := \033[0m
+
 define target_success
-	@printf "\033[32m==> Target \"$(1)\" passed\033[0m\n\n"
+	@printf "${GREEN}==> Target \"$(1)\" passed${NC}\n\n"
 endef
 
 .DEFAULT_GOAL := crix-callgraph
@@ -36,10 +41,16 @@ TARGET: ## DESCRIPTION
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?##.*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[32m%-30s\033[0m %s\n", $$1, $$2}'
 
-llvm-check:
+LLVM_FIX := sudo apt install clang-10 llvm-10 llvm-10-dev
+llvm-check: ## Check LLVM is available
 	@if [ ! -d ${LLVM_DIR} ]; then \
-		echo "Error: '${CLANG_BIN_DIR}' does not exist."; \
-		echo -e "Install clang-10 (sudo apt install clang-10) and try again."; \
+		printf "${RED}Error: '${LLVM_DIR}' does not exist${NC}\n"; \
+		printf "${YELLOW}Install llvm-10 (${LLVM_FIX}) and try again${NC}\n"; \
+		false; \
+	fi
+	@if [ ! -d ${LLVM_DIR}/lib/cmake/llvm ]; then \
+		printf "${RED}Error: '${LLVM_DIR}/lib/cmake/llvm' does not exist${NC}\n"; \
+		printf "${YELLOW}Install llvm-10 (${LLVM_FIX}) and try again${NC}\n"; \
 		false; \
 	fi
 
