@@ -1,16 +1,16 @@
 #ifndef COMMON_H
 #define COMMON_H
 
-#include <llvm/IR/Module.h>
 #include <llvm/Analysis/TargetLibraryInfo.h>
-#include <llvm/Support/raw_ostream.h>
-#include <llvm/Support/CommandLine.h>
 #include <llvm/IR/DebugInfo.h>
+#include <llvm/IR/Module.h>
+#include <llvm/Support/CommandLine.h>
+#include <llvm/Support/raw_ostream.h>
 
-#include <unistd.h>
 #include <bitset>
 #include <chrono>
 #include <stdio.h>
+#include <unistd.h>
 
 using namespace llvm;
 using namespace std;
@@ -21,19 +21,19 @@ using namespace std;
 
 #define DSTREAM stderr
 #define LOG(str) LOG_FMT("%s\n", str)
-#define LOG_OBJ(str, obj) \
-    do { \
-      if (DEBUG) {\
-        LOG_FMT("%s ", str); \
-        obj->print(OP); \
-        OP << "\n"; \
-      } \
-    } while(0)
-#define LOG_FMT(fmt, ...) \
-    do { \
-      if (DEBUG) \
-        fprintf(DSTREAM, "[%s:%d]: " fmt, __func__, __LINE__, __VA_ARGS__);\
-    } while (0)
+#define LOG_OBJ(str, obj)                                                      \
+  do {                                                                         \
+    if (DEBUG) {                                                               \
+      LOG_FMT("%s ", str);                                                     \
+      obj->print(OP);                                                          \
+      OP << "\n";                                                              \
+    }                                                                          \
+  } while (0)
+#define LOG_FMT(fmt, ...)                                                      \
+  do {                                                                         \
+    if (DEBUG)                                                                 \
+      fprintf(DSTREAM, "[%s:%d]: " fmt, __func__, __LINE__, __VA_ARGS__);      \
+  } while (0)
 #define DEBUG_SPAM 2
 
 //

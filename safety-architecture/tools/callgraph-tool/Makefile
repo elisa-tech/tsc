@@ -72,7 +72,7 @@ style-pyc: ## Check with pycodestyle
 style-cpp: ## Check with clang-format
 	scripts/clang_format.sh --warn --style LLVM
 
-style: style-pyc ## Check style
+style: style-pyc style-cpp ## Check style
 
 crix-callgraph: llvm-check ## Build crix-callgraph
 	$(call build_analyzer_func, ${CRIXCG_SRC_DIR}, ${CRIXCG_BUILD_DIR})
