@@ -10,7 +10,6 @@ import sys
 import hashlib
 import logging
 import argparse
-import clang_download
 import subprocess
 
 from colorlog import ColoredFormatter, default_log_colors
