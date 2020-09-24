@@ -71,6 +71,7 @@ style-pyc: ## Check with pycodestyle
 
 style-cpp: ## Check with clang-format
 	scripts/clang_format.sh --warn --style LLVM
+	$(call target_success,$@)
 
 style: style-pyc style-cpp ## Check style
 
