@@ -34,7 +34,7 @@ class CallGraphFilter():
     def get_query_str(self):
         return ' & '.join(
             ["{}=='{}'".format(key, value)
-             for key, value in self.__dict__.items() if not value is None])
+             for key, value in self.__dict__.items() if value is not None])
 
     def __eq__(self, other):
         if isinstance(other, CallGraphFilter):
@@ -42,7 +42,7 @@ class CallGraphFilter():
                 self.caller_function == other.caller_function and
                 self.caller_filename == other.caller_filename and
                 self.callee_function == other.callee_function and
-                self.callee_filename == other.callee_filename )
+                self.callee_filename == other.callee_filename)
         return False
 
 ################################################################################
@@ -131,8 +131,7 @@ class Grapher():
                     DBG_INDENT*(curr_depth-1),
                     row.caller_function,
                     row.callee_function,
-                    row.callee_calltype,
-                ))
+                    row.callee_calltype))
             # Add caller node
             self._add_node(
                 row.caller_function,
@@ -145,7 +144,6 @@ class Grapher():
                 row.callee_line)
             # Add edge between the nodes
             self._add_edge(row)
-
 
             # Recursively find the next node
             if inverse:

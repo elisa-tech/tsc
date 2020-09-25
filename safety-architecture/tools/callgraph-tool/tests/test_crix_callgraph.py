@@ -16,7 +16,7 @@ import pandas as pd
 ################################################################################
 
 TESTS_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
-TEST_RESOURCES_DIR = TESTS_DIR / "resources"
+TEST_RESOURCES_DIR = TESTS_DIR / "resources" / "crix-callgraph"
 TEST_DATA_DIR = TESTS_DIR / "main_test_data"
 CG_BIN = TESTS_DIR / ".." / "build" / "lib" / "crix-callgraph"
 BC_GENERATE = TEST_RESOURCES_DIR / "generate_bitcodes.sh"

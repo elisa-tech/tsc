@@ -84,5 +84,5 @@ clean-pyc: ## Remove Python artifacts
 	find . -name '__pycache__' -exec rm -fr {} +
 
 clean: clean-pyc ## Remove all build artifacts
-	cd tests/resources && make clean
+	cd tests/resources/crix-callgraph && make clean
 	rm -rf ${CRIXCG_BUILD_DIR}
