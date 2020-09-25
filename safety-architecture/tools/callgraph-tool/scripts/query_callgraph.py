@@ -154,6 +154,7 @@ class Grapher():
                 filter = CallGraphFilter(
                     caller_function=row.callee_function,
                     caller_filename=row.callee_filename)
+
             self._graph(filter, curr_depth, inverse, prev_filter)
 
     def _query(self, filter, depth):
@@ -182,14 +183,14 @@ class Grapher():
             end = "</FONT>"
             label = "<%s%s%s>" % (beg, row.caller_line, end)
             self.digraph.edge(
-                row.caller_function,
-                row.callee_function,
+                "%s_%s" % (row.caller_filename, row.caller_function),
+                "%s_%s" % (row.callee_filename, row.callee_function),
                 label=label,
                 style=edge_style)
         else:
             self.digraph.edge(
-                row.caller_function,
-                row.callee_function,
+                "%s_%s" % (row.caller_filename, row.caller_function),
+                "%s_%s" % (row.callee_filename, row.callee_function),
                 style=edge_style)
 
     def _add_node(self, function, filename, line):
@@ -198,8 +199,9 @@ class Grapher():
         function = str(function)
         filename = str(filename)
         line = str(line).split('.')[0]
+        node_name = "%s_%s" % (filename, function)
         # Node name = function, Default label = []
-        labels = self.nodelabels.setdefault(function, [])
+        labels = self.nodelabels.setdefault(node_name, [])
         # Add filename as new label
         labels.append("%s:%s" % (filename, line))
         # Remove possible duplicate labels, preserving order
@@ -210,7 +212,8 @@ class Grapher():
         end = "</FONT>"
         label = "<%s<BR/>%s%s%s>" % (function, beg, "<BR/>".join(labels), end)
         # Add node to the graph
-        self.digraph.node(function, label)
+        self.digraph.node(
+            node_name, label, style='rounded,filled', fillcolor='#EEEEEE')
 
 
 ################################################################################
