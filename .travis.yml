@@ -44,6 +44,7 @@ matrix:
                   - llvm-10
                   - llvm-10-dev
                   - clang-format-10
+                  - graphviz
       python:
         - "3.6"
       before_install:
@@ -68,6 +69,7 @@ matrix:
                   - llvm-10
                   - llvm-10-dev
                   - clang-format-10
+                  - graphviz
       python:
         - "3.7"
       before_install:
