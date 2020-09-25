@@ -12,48 +12,18 @@ import shutil
 import csv
 from pathlib import Path
 import pandas as pd
+import test_utils
 
 ################################################################################
 
+
 TESTS_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
 TEST_RESOURCES_DIR = TESTS_DIR / "resources" / "crix-callgraph"
-TEST_DATA_DIR = TESTS_DIR / "main_test_data"
+TEST_DATA_DIR = TESTS_DIR / "crix_callgraph_test_data"
 CG_BIN = TESTS_DIR / ".." / "build" / "lib" / "crix-callgraph"
 BC_GENERATE = TEST_RESOURCES_DIR / "generate_bitcodes.sh"
 EXPECTED = TEST_RESOURCES_DIR / "expected_calls.csv"
 
-################################################################################
-
-
-def df_to_string(df):
-    return \
-        "\n" + \
-        df.to_string(
-            max_rows=None,
-            max_cols=None,
-            index=False,
-            justify='left') + \
-        "\n"
-
-
-def df_difference(df_left, df_right):
-    df = df_left.merge(
-        df_right,
-        how='outer',
-        indicator=True,
-    )
-    # Keep only the rows that differ (that are not in both)
-    df = df[df['_merge'] != 'both']
-    # Rename 'left_only' and 'right_only' values in '_merge' column
-    df['_merge'] = df['_merge'].replace(['left_only'], 'EXPECTED ==>  ')
-    df['_merge'] = df['_merge'].replace(['right_only'], 'RESULT ==>  ')
-    # Re-order columns: last column ('_merge') becomes first
-    cols = df.columns.tolist()
-    cols = cols[-1:] + cols[:-1]
-    df = df[cols]
-    # Rename '_merge' column to empty string
-    df = df.rename(columns={"_merge": ""})
-    return df
 
 ################################################################################
 
@@ -82,7 +52,6 @@ def clean_up_session_test_data():
 def set_up_test_data():
     print("test setup")
     shutil.rmtree(TEST_DATA_DIR, ignore_errors=True)
-    # TODO: clang?
     os.makedirs(TEST_DATA_DIR)
     yield "resource"
     print("test clean up")
@@ -112,8 +81,8 @@ def check_function_calls_from(target_bclist_file_name):
     caller_regex = "^%s" % os.path.splitext(target_bclist_file_name)[0]
     df_expected = df_regex_filter(df_expected, "caller_filename", caller_regex)
     df_generated = pd.read_csv(outfile)
-    df_diff = df_difference(df_expected, df_generated)
-    assert df_diff.empty, df_to_string(df_diff)
+    df_diff = test_utils.df_difference(df_expected, df_generated)
+    assert df_diff.empty, test_utils.df_to_string(df_diff)
 
 
 def test_help():
