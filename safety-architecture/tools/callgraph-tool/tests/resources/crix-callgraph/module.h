@@ -1,0 +1,1 @@
+void module_call();

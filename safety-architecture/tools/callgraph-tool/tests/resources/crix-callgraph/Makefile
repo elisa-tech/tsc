@@ -78,6 +78,15 @@ expected_calls: progs cg-test-template test-opt
 	@printf "\nWrote: '$@.csv'\n"
 	$(call target_success,$@)
 
+test-same-funcname: clang-check cg-bin
+	$(CC) $(CFLAGS) $(INC) -emit-llvm -c test-same-funcname.c -o $@.bc
+	$(CC) $(CFLAGS) $(INC) -emit-llvm -c module.c -o module.bc
+# To test the binary:
+# $(CC) $(CFLAGS) $(INC) test-same-funcname.c module.c -o test-same-funcname
+	echo $@.bc >$@.bclist
+	echo module.bc >>$@.bclist
+	$(CG_BIN) -o $@.csv @$@.bclist 2>/dev/null
+
 # Clean everything except expected_calls.csv
 clean:
 	cd cg-temp && make clean
