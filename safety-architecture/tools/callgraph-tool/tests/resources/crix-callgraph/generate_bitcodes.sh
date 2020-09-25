@@ -21,6 +21,7 @@ exit_unless_command_exists make
 make
 make cg-test-template
 make test-opt
+make test-same-funcname
 
 popd >/dev/null
 

@@ -4,31 +4,33 @@
 #include <llvm/IR/InstIterator.h>
 #include <regex>
 
-//#define HASH_SOURCE_INFO
 size_t funcHash(Function *F, bool withName) {
 
   hash<string> str_hash;
   string output;
 
-#ifdef HASH_SOURCE_INFO
-  DISubprogram *SP = F->getSubprogram();
+  string sig;
+  raw_string_ostream rso(sig);
+  Type *FTy = F->getFunctionType();
+  FTy->print(rso);
+  output = rso.str();
 
-  if (SP) {
-    output = SP->getFilename();
-    output = output + to_string(uint_hash(SP->getLine()));
-  } else {
+  if (withName) {
+    output += F->getName();
+
+#if 1
+    if (!F->hasExternalLinkage()) {
+      // For file local (static) functions, include the filename into the
+      // hash, so that it will not collide with possible global function
+      // with the same name
+      DISubprogram *SP = F->getSubprogram();
+      if (SP) {
+        output = SP->getFilename().str() + ":" + output;
+      }
+    }
 #endif
-    string sig;
-    raw_string_ostream rso(sig);
-    Type *FTy = F->getFunctionType();
-    FTy->print(rso);
-    output = rso.str();
-
-    if (withName)
-      output += F->getName();
-#ifdef HASH_SOURCE_INFO
   }
-#endif
+
   string::iterator end_pos = remove(output.begin(), output.end(), ' ');
   output.erase(end_pos, output.end());
 

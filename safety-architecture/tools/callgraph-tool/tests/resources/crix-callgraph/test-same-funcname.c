@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "module.h"
+#include "test-same-funcname.module.h"
 
 static void say_hello()
 {

@@ -35,4 +35,7 @@
 "test-mlta.c","main","29","34","test-mlta.c","copy_with_check","15","indirect","","","MLTA"
 "test-mlta.c","main","29","35","test-mlta.c","copy_no_check","19","indirect","","","MLTA"
 "test-opt.c","main","13","15","test-opt.c","do_nothing","9","direct","","",""
+"test-same-funcname.c","main","9","11","test-same-funcname.c","say_hello","4","direct","","",""
+"test-same-funcname.c","main","9","12","test-same-funcname.module.c","module_call","8","direct","","",""
+"test-same-funcname.module.c","module_call","8","10","test-same-funcname.module.c","say_hello","3","direct","","",""
 "test-sizeof.c","main","9","16","test-sizeof.c","func","4","direct","","",""
