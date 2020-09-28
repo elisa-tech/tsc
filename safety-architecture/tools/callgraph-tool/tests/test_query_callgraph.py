@@ -89,7 +89,7 @@ def test_png_graph(set_up_test_data):
     cmd = [
         QUERY_CG,
         "--csv", callgraph_csv,
-        "--caller_function", "main",
+        "--function", "main",
         "--depth", "10",
         "--out", query_out
     ]
@@ -108,7 +108,7 @@ def test_png_graph_edge_labels(set_up_test_data):
     cmd = [
         QUERY_CG,
         "--csv", callgraph_csv,
-        "--caller_function", "main",
+        "--function", "main",
         "--depth", "10",
         "--edge_labels",
         "--out", query_out
@@ -128,7 +128,7 @@ def test_csv_graph(set_up_test_data):
     cmd = [
         QUERY_CG,
         "--csv", callgraph_csv,
-        "--caller_function", "main",
+        "--function", "main",
         "--depth", "10",
         "--out", query_out
     ]
@@ -148,7 +148,7 @@ def test_csv_graph_inverse(set_up_test_data):
     cmd = [
         QUERY_CG,
         "--csv", callgraph_csv,
-        "--caller_function", "main",
+        "--function", "main",
         "--depth", "10",
         "--out", query_out
     ]
@@ -159,7 +159,54 @@ def test_csv_graph_inverse(set_up_test_data):
     cmd = [
         QUERY_CG,
         "--csv", callgraph_csv,
-        "--caller_function", "say_hello",
+        "--function", "say_hello",
+        "--depth", "10",
+        "--inverse",
+        "--out", query_out_inverse
+    ]
+
+    assert subprocess.run(cmd).returncode == 0
+    assert Path(query_out_inverse).exists()
+
+    # When 'depth' covers the entire callgraph, the output from
+    # the two above commands should be the same, except for column
+    # 'call_depth': below, we remove that column from both outputs and
+    # compare the two dataframes
+
+    df_csv = pd.read_csv(query_out)
+    assert not df_csv.empty
+    df_csv = df_csv.drop('call_depth', 1)
+    df_csv = df_csv.sort_values(by=['caller_line'])
+
+    df_csv_inv = pd.read_csv(query_out_inverse)
+    assert not df_csv_inv.empty
+    df_csv_inv = df_csv_inv.drop('call_depth', 1)
+    df_csv_inv = df_csv_inv.sort_values(by=['caller_line'])
+
+    df_diff = test_utils.df_difference(df_csv, df_csv_inv)
+    assert df_diff.empty, test_utils.df_to_string(df_diff)
+
+
+def test_csv_graph_duplicate(set_up_test_data):
+    callgraph_csv = TEST_DATA_DIR / "calls.csv"
+    generate_call_graph_from("test-duplicate-path.bclist", callgraph_csv)
+
+    query_out = TEST_DATA_DIR / "graph.csv"
+    cmd = [
+        QUERY_CG,
+        "--csv", callgraph_csv,
+        "--function", "main",
+        "--depth", "10",
+        "--out", query_out
+    ]
+    assert subprocess.run(cmd).returncode == 0
+    assert Path(query_out).exists()
+
+    query_out_inverse = TEST_DATA_DIR / "graph_inverse.csv"
+    cmd = [
+        QUERY_CG,
+        "--csv", callgraph_csv,
+        "--function", "say_hello",
         "--depth", "10",
         "--inverse",
         "--out", query_out_inverse

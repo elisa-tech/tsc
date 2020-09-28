@@ -45,6 +45,7 @@ class CallGraphFilter():
                 self.callee_filename == other.callee_filename)
         return False
 
+
 ################################################################################
 
 
@@ -53,85 +54,104 @@ DBG_INDENT = "    "
 
 class Grapher():
 
-    def __init__(self, csvfile, depth, edge_labels):
+    def __init__(self, csvfile):
         self.df = df_from_csv_file(csvfile)
         self.digraph = None
-        self.maxdepth = 1
-        self.edge_labels = edge_labels
         # Key: node name, Value: list of labels associated to node name
         self.nodelabels = {}
         # Rows that match the query when output format is csv
         self.df_out_csv = None
+        # Keep track of paths drawn to not re-draw them
+        self.paths_drawn = set()
+        # Default parameters
+        self.maxdepth = 1
+        self.edge_labels = False
+        self.skip_indirect = False
+        self.merge_edges = False
+        self.inverse = False
 
-    def graph_caller_function(
-            self,
-            caller_function,
-            outfilename,
-            depth,
-            inverse=False):
+    def graph(self, args):
+        self._is_csv_out(args.out)
+        self.maxdepth = args.depth
+        self.inverse = args.inverse
+        self.edge_labels = args.edge_labels
+        self.skip_indirect = args.skip_indirect
+        self.merge_edges = args.merge_edges
 
-        self._is_csv_out(outfilename)
-        self.digraph = gv.Digraph(filename=outfilename)
+        if args.edge_labels and args.merge_edges:
+            _LOGGER.warn(
+                "Requested both 'edge_labels' and 'merge_edges': "
+                "discarding 'edge_labels'"
+            )
+            self.edge_labels = False
+
+        concentrate = 'true' if self.merge_edges else 'false'
+        self.digraph = gv.Digraph(filename=args.out)
         self.digraph.attr('graph', rankdir='LR')
-        self.digraph.attr('graph', concentrate='false')
         self.digraph.attr('node', shape='box')
         self.digraph.attr('node', style='rounded')
         self.digraph.attr('node', margin='0.3,0.1')
-        self.maxdepth = depth
-        initlen = len(self.digraph.body)
+        self.digraph.attr('graph', concentrate=concentrate)
 
-        if inverse:
+        if self.inverse:
             # Filter by callee_function if 'inverse' requested
-            filter = CallGraphFilter(callee_function=caller_function)
+            filter = CallGraphFilter(callee_function=args.function)
         else:
             # Otherwise filter by caller_function
-            filter = CallGraphFilter(caller_function=caller_function)
+            filter = CallGraphFilter(caller_function=args.function)
 
-        # Query
-        self._graph(filter=filter, inverse=inverse)
+        # Initial number of entries in the graph
+        initlen = len(self.digraph.body)
 
-        # Output image if graph entries were added
+        # Draw the graph
+        self._graph(filter=filter)
+
+        # Render the graph
         if len(self.digraph.body) > initlen:
-            self._render(outfilename)
+            self._render(args.out)
 
-        # Output csv if entries were added
+        # Output csv
         if self.df_out_csv is not None and not self.df_out_csv.empty:
-            df_to_csv_file(self.df_out_csv, outfilename)
+            df_to_csv_file(self.df_out_csv, args.out)
 
     def _is_csv_out(self, filename):
         _fname, extension = os.path.splitext(filename)
-        format = extension[1:]
-        if format == 'csv':
+        fileformat = extension[1:]
+        if fileformat == 'csv':
             self.df_out_csv = pd.DataFrame()
         else:
             self.df_out_csv = None
 
-    def _graph(self, filter, curr_depth=0, inverse=False, prev_filter=None):
+    def _graph(self, filter, curr_depth=0, curr_row=None):
         curr_depth += 1
         if curr_depth > self.maxdepth:
             return
+
         df = self._query(filter, curr_depth)
         if df.empty and curr_depth == 1:
+            # First match failed: print to console and stop
             _LOGGER.info("No matching functions found")
             return
         if df.empty:
+            # Reached leaf: no more matches
             _LOGGER.debug("%sFound nothing" % (DBG_INDENT*(curr_depth-1)))
             return
-        if prev_filter is not None and prev_filter == filter:
-            _LOGGER.debug("%sReached leaf node" % (DBG_INDENT*(curr_depth-1)))
-            return
+
         if self.df_out_csv is not None:
             df.insert(0, "call_depth", curr_depth)
             self.df_out_csv = self.df_out_csv.append(df)
 
-        prev_filter = filter
         for row in df.itertuples():
-            _LOGGER.debug(
-                "%sFound: %s() ==> %s() [%s]" % (
-                    DBG_INDENT*(curr_depth-1),
-                    row.caller_function,
-                    row.callee_function,
-                    row.callee_calltype))
+            self._dbg_print_row(row, curr_depth)
+            if self.skip_indirect and row.callee_calltype == "indirect":
+                _LOGGER.debug(
+                    "%sSkipping indirect" % (DBG_INDENT*(curr_depth-1)))
+                continue
+            if self._path_drawn(row):
+                _LOGGER.debug(
+                    "%sSkipping duplicate path" % (DBG_INDENT*(curr_depth-1)))
+                continue
+
             # Add caller node
             self._add_node(
                 row.caller_function,
@@ -145,8 +165,8 @@ class Grapher():
             # Add edge between the nodes
             self._add_edge(row)
 
-            # Recursively find the next node
-            if inverse:
+            # Construct the filter for next query in the call chain
+            if self.inverse:
                 filter = CallGraphFilter(
                     callee_function=row.caller_function,
                     callee_filename=row.caller_filename)
@@ -155,10 +175,27 @@ class Grapher():
                     caller_function=row.callee_function,
                     caller_filename=row.callee_filename)
 
-            self._graph(filter, curr_depth, inverse, prev_filter)
+            # Recursively find the next entries
+            self._graph(filter, curr_depth, row)
+
+    def _path_drawn(self, row):
+        if row is None:
+            return False
+        hash_str = "%s:%s:%s:%s:%s:%s" % (
+            row.caller_filename,
+            row.caller_function,
+            row.caller_line,
+            row.callee_filename,
+            row.callee_function,
+            row.callee_line)
+        h = hash(hash_str)
+        if h in self.paths_drawn:
+            return True
+        else:
+            self.paths_drawn.add(h)
+            return False
 
     def _query(self, filter, depth):
-        # TODO: Cache results
         query_str = filter.get_query_str()
         _LOGGER.debug("%sFiltering by: %s" % (DBG_INDENT*(depth-1), query_str))
         return self.df.query(query_str)
@@ -167,7 +204,6 @@ class Grapher():
         if self.df_out_csv is not None:
             return
         fname, extension = os.path.splitext(filename)
-        # fname = "%s.dot" % fname
         format = extension[1:]
         self.digraph.render(filename=fname, format=format, cleanup=True)
         _LOGGER.info("wrote: %s" % filename)
@@ -215,6 +251,13 @@ class Grapher():
         self.digraph.node(
             node_name, label, style='rounded,filled', fillcolor='#EEEEEE')
 
+    def _dbg_print_row(self, row, depth):
+        _LOGGER.debug(
+            "%sFound: %s:%s():%s ==> %s:%s():%s [%s]" % (
+                DBG_INDENT*(depth-1),
+                row.caller_filename, row.caller_function, row.caller_line,
+                row.callee_filename, row.callee_function, row.callee_line,
+                row.callee_calltype))
 
 ################################################################################
 
@@ -245,7 +288,7 @@ def getargs():
     desc = "Query and visualize call graphs given the callgraph csv "\
         "database (CSV)."
 
-    epil = "Example: ./%s --csv callgraph.csv --caller_function "\
+    epil = "Example: ./%s --csv callgraph.csv --function "\
         "'main' --depth 4" % \
         os.path.basename(__file__)
     parser = argparse.ArgumentParser(description=desc, epilog=epil)
@@ -255,9 +298,9 @@ def getargs():
     help = "function call database csv file"
     required_named.add_argument('--csv', help=help, required=True)
 
-    help = "filter by caller_function (exact match)"
+    help = "filter by function name (exact match)"
     required_named.add_argument(
-        '--caller_function', help=help, required=True)
+        '--function', help=help, required=True)
 
     help = "set the graph depth, defaults to 2"
     parser.add_argument(
@@ -277,11 +320,16 @@ def getargs():
     parser.add_argument(
         '--out', nargs='?', help=help, default='graph.png')
 
-    help = "Add edge labels to graph. This options adds caller "\
-        "source line numbers as edge labels to graph. Implicitly, this "\
-        "also disables merging graph edges, see: "\
-        "https://graphviz.org/doc/info/attrs.html#d:concentrate"
+    help = "Add edge labels to graph. This option adds caller "\
+        "source line numbers as edge labels to graph."
     parser.add_argument('--edge_labels', help=help, action='store_true')
+
+    help = "Do not include indirect calls to the output."
+    parser.add_argument('--skip_indirect', help=help, action='store_true')
+
+    help = "Merge edges: if two nodes are connected with multiple edges, "\
+        "merge the multiedges into single edge."
+    parser.add_argument('--merge_edges', help=help, action='store_true')
 
     help = "Set the verbose level (defaults to --v=1)"
     parser.add_argument('--verbose', help=help, type=int, default=1)
@@ -299,12 +347,7 @@ if __name__ == "__main__":
     utils.setup_logging(verbosity=args.verbose)
 
     _LOGGER.info("reading input csv")
-    g = Grapher(args.csv, args.depth, args.edge_labels)
-    g.graph_caller_function(
-        caller_function=args.caller_function,
-        depth=args.depth,
-        inverse=args.inverse,
-        outfilename=args.out,
-    )
+    g = Grapher(args.csv)
+    g.graph(args)
 
 ################################################################################

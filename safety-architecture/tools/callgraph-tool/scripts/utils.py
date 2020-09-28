@@ -73,7 +73,7 @@ def exec_cmd(cmd):
     _LOGGER.debug("Running: %s" % command_str)
     ret = subprocess.run(cmd)
     if ret.returncode != 0:
-        _LOGGER.debug("Command retuned error status: %s" % ret.returncode)
+        _LOGGER.debug("Command returned error status: %s" % ret.returncode)
         _LOGGER.debug("stdout: %s" % ret.stdout)
         _LOGGER.debug("stderr: %s" % ret.stderr)
 

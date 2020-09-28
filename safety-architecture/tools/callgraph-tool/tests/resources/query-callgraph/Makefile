@@ -10,6 +10,7 @@ PATH := $(CLANG_BIN_DIR):$(PATH)
 # List of target programs
 PROGS = \
   test-chain\
+  test-duplicate-path\
 
 progs: $(PROGS)
 
