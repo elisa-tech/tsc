@@ -10,6 +10,7 @@ import sys
 import logging
 import graphviz as gv
 import pandas as pd
+import re
 import utils
 from collections import OrderedDict
 from typing import NamedTuple
@@ -69,6 +70,8 @@ class Grapher():
         self.skip_indirect = False
         self.merge_edges = False
         self.inverse = False
+        self.until_func_regex = None
+        self.colorize_regex = None
 
     def graph(self, args):
         self._is_csv_out(args.out)
@@ -77,6 +80,8 @@ class Grapher():
         self.edge_labels = args.edge_labels
         self.skip_indirect = args.skip_indirect
         self.merge_edges = args.merge_edges
+        self.until_func_regex = r'%s' % args.until_function
+        self.colorize_regex = r'%s' % args.colorize
 
         if args.edge_labels and args.merge_edges:
             _LOGGER.warn(
@@ -122,7 +127,7 @@ class Grapher():
         else:
             self.df_out_csv = None
 
-    def _graph(self, filter, curr_depth=0, curr_row=None):
+    def _graph(self, filter, curr_depth=0):
         curr_depth += 1
         if curr_depth > self.maxdepth:
             return
@@ -165,6 +170,11 @@ class Grapher():
             # Add edge between the nodes
             self._add_edge(row)
 
+            if regex_match(self.until_func_regex, row.caller_function):
+                _LOGGER.debug(
+                    "%sReached until_function" % (DBG_INDENT*(curr_depth-1)))
+                continue
+
             # Construct the filter for next query in the call chain
             if self.inverse:
                 filter = CallGraphFilter(
@@ -176,7 +186,7 @@ class Grapher():
                     caller_filename=row.callee_filename)
 
             # Recursively find the next entries
-            self._graph(filter, curr_depth, row)
+            self._graph(filter, curr_depth)
 
     def _path_drawn(self, row):
         if row is None:
@@ -247,9 +257,12 @@ class Grapher():
         beg = "<FONT POINT-SIZE=\"10\">"
         end = "</FONT>"
         label = "<%s<BR/>%s%s%s>" % (function, beg, "<BR/>".join(labels), end)
+        fillcolor = '#EEEEEE'
+        if regex_match(self.colorize_regex, function):
+            fillcolor = "#FFE6E6"
         # Add node to the graph
         self.digraph.node(
-            node_name, label, style='rounded,filled', fillcolor='#EEEEEE')
+            node_name, label, style='rounded,filled', fillcolor=fillcolor)
 
     def _dbg_print_row(self, row, depth):
         _LOGGER.debug(
@@ -282,6 +295,12 @@ def check_positive(val):
         raise argparse.ArgumentTypeError(
             "%s is not positive integer" % val)
     return intval
+
+
+def regex_match(regex, s):
+    if (not regex or not s):
+        return False
+    return re.match(regex, s) is not None
 
 
 def getargs():
@@ -330,6 +349,16 @@ def getargs():
     help = "Merge edges: if two nodes are connected with multiple edges, "\
         "merge the multiedges into single edge."
     parser.add_argument('--merge_edges', help=help, action='store_true')
+
+    help = "Keep drawing the call chains until function name matches "\
+        "the specified regular expression. This option works together with "\
+        "--depth so that drawing stops when the first of the two "\
+        "conditions match: when the function name matches the given regex "\
+        "or when the specified call chain depth is reached."
+    parser.add_argument('--until_function', help=help)
+
+    help = "Colorize functions that match the specified regural expression."
+    parser.add_argument('--colorize', help=help)
 
     help = "Set the verbose level (defaults to --v=1)"
     parser.add_argument('--verbose', help=help, type=int, default=1)
