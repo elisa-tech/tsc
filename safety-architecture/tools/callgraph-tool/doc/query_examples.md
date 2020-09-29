@@ -5,24 +5,23 @@ This page documents instructions and examples on how to visualize and query the 
 Table of Contents
 =================
 
-   * [How to visualize and query the callgraph data](#how-to-visualize-and-query-the-callgraph-data)
-      * [Setup](#setup)
-      * [Building kernel bitcode files with compiler optimizations disabled](#building-kernel-bitcode-files-with-compiler-optimizations-disabled)
-            * [Patch compiler_attributes.h](#patch-compiler_attributesh)
-            * [Build compilation database](#build-compilation-database)
-            * [Build bitcode files](#build-bitcode-files)
-            * [Run the crix-callgraph tool](#run-the-crix-callgraph-tool)
-      * [How to use the callgraph database](#how-to-use-the-callgraph-database)
-            * [Example: functions called by sock_recvmsg](#example-functions-called-by-sock_recvmsg)
-            * [Example: functions calling sock_recvmsg](#example-functions-calling-sock_recvmsg)
-            * [Example: visualizing syscalls calling sock_recvmsg](#example-visualizing-syscalls-calling-sock_recvmsg)
+* [Setup](#setup)
+* [Building kernel bitcode files with compiler optimizations disabled](#building-kernel-bitcode-files-with-compiler-optimizations-disabled)
+    * [Patch compiler_attributes.h](#patch-compiler_attributesh)
+    * [Build compilation database](#build-compilation-database)
+    * [Build bitcode files](#build-bitcode-files)
+    * [Run the crix-callgraph tool](#run-the-crix-callgraph-tool)
+* [How to use the callgraph database](#how-to-use-the-callgraph-database)
+    * [Example: functions called by sock_recvmsg](#example-functions-called-by-sock_recvmsg)
+    * [Example: functions calling sock_recvmsg](#example-functions-calling-sock_recvmsg)
+    * [Example: visualizing syscalls calling sock_recvmsg](#example-visualizing-syscalls-calling-sock_recvmsg)
 
 ## Setup
-First, follow the setup instructions from the main [README](../README.md):
+To begin, make sure you have gone through the following the setup instructions from the main [README](../README.md):
 - [Getting started](../README.md#getting-started)
-- [Build the crix-callgraph tool](../README.md#build-the-crix-callgrpah-tool)
+- [Build the crix-callgraph tool](../README.md#build-the-crix-callgraph-tool)
 
-Additionally, in these instructions we are going to use [bear](https://github.com/rizsotto/Bear) to generate the compilation database. Bear is available e.g. via Ubuntu package manager:
+Additionally, in these instructions, we are going to use [bear](https://github.com/rizsotto/Bear) to generate the compilation database. Bear is available e.g. via Ubuntu package manager:
 ```
 sudo apt install bear
 ```
@@ -112,7 +111,7 @@ Output:
 <img src=sock_recvmsg_d1.png>
 <br /><br />
 
-The output graph shows that function `sock_recvmsg` is defined in file net/socket.c on line 900. It calls three functions: `msg_data_left`, `security_socket_recvmsg`, and `sock_recvmsg_nosec`. The calls to these functions takes place from net/socket.c on lines 902, 902, and 904. The three called functions are defined in include/linux/socket.h:157, security/security.c:2127, and net/socket.c:883 respectively. Notice the node labels refer each function's definition, not declaration.
+The output graph shows that function `sock_recvmsg` is defined in file net/socket.c on line 900. It calls three functions: `msg_data_left`, `security_socket_recvmsg`, and `sock_recvmsg_nosec`. The calls to these functions takes place from net/socket.c on lines 902, 902, and 904. The three called functions are defined in include/linux/socket.h:157, security/security.c:2127, and net/socket.c:883 respectively. Notice the node labels refer each function's definition, not declaration location.
 
 Increasing the `--depth` argument makes the query_callgraph.py walk the call chains deeper. For instance, with `--depth 2`, the output becomes:
 
@@ -143,7 +142,7 @@ Output:
 <img src=sock_recvmsg_d1_inverse.png>
 <br /><br />
 
-The output graph now shows that there are ten functions that can call `sock_recvmsg`: for instance, the function `io_recv`, which is defined in fs/io_uring.c on line 3906, calls `sock_recvmsg` on line 3947. The dashed line means that there is one function `security_socket_sendmsg` where `sock_recvmsg` is possibly called through a function pointer.
+The output graph now shows that there are ten functions that can call `sock_recvmsg`: for instance, the function `io_recv`, which is defined in fs/io_uring.c on line 3906, calls `sock_recvmsg` on line 3947. The dashed line means that there is one function, namely `security_socket_sendmsg`, where `sock_recvmsg` is possibly called through a function pointer.
 
 Again, increasing the `--depth` argument makes the query_callgraph.py walk the call chains deeper. For instance, with `--inverse` and `--depth 2`, the output becomes:
 
@@ -172,9 +171,9 @@ cd $CG_DIR
 --out sock_recvmsg_syscalls.png --inverse
 ```
 
-We use the `--until_function` to stop drawing when the call chain reaches a function call whose name looks like a system call. Also, we use the `--colorize` to highlight such function calls. The `--merge_edges` is used to reduce noise by including only one association between two function calls for cases where there would be many.
+We use the `--until_function` to stop drawing when the call chain reaches a function call whose name looks like a system call, that is, the function name begins with '__x64_sys'. Also, we use the `--colorize` option to highlight such function calls in the resulting output graph. The `--merge_edges` is used to reduce noise by including only one association between two function calls for cases where there would be many.
 
 <img src=sock_recvmsg_syscalls.png>
 <br /><br />
 
-The output graph shows that there are three syscalls, whose call chain might reach `sock_recvmsg`: `__x64_sys_recvfrom`, `__x64_sys_recv`, and `__x64_sys_socketcall` defined at net/socket.c:2066, net/socket.c:2077, and net/socket.c:2852 respectively.
+The output graph shows that there are three syscalls whose call chain might reach `sock_recvmsg`: `__x64_sys_recvfrom`, `__x64_sys_recv`, and `__x64_sys_socketcall` defined at net/socket.c:2066, net/socket.c:2077, and net/socket.c:2852 respectively.
