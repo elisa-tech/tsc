@@ -9,6 +9,7 @@ import sys
 import re
 import argparse
 import logging
+import multiprocessing
 import utils
 
 ###############################################################################
@@ -72,23 +73,35 @@ class BitcodeCompiler():
         else:
             commands = compdb.getAllCompileCommands()
 
-        for cc in commands:
-            # Arguments from compdb
-            arglist = [arg for arg in cc.arguments]
-            # Replace first argument (compiler) with clang
-            arglist.pop(0)
-            arglist.insert(0, self.clang_bin)
-            # Add arguments: -c -emit-llvm
-            arglist.insert(1, "-c")
-            arglist.insert(2, "-emit-llvm")
-            # Add ".bc" postfix to the original output filename
-            for i, value in enumerate(arglist):
-                if value == "-o" and len(arglist) > i:
-                    if not arglist[i + 1].endswith(".bc"):
-                        arglist[i + 1] = "%s.bc" % arglist[i + 1]
-            # Additional arguments from command line
-            arglist = arglist + self.append_args
-            utils.exec_cmd(arglist)
+        cpu_count = multiprocessing.cpu_count()
+        _LOGGER.debug("Starting compile jobs (processes=%s)" % cpu_count)
+
+        with multiprocessing.Pool(processes=cpu_count) as pool:
+            results = []
+            for cc in commands:
+                # Arguments from compdb
+                arglist = [arg for arg in cc.arguments]
+                # Replace first argument (compiler) with clang
+                arglist.pop(0)
+                arglist.insert(0, self.clang_bin)
+                # Add arguments: -c -emit-llvm
+                arglist.insert(1, "-c")
+                arglist.insert(2, "-emit-llvm")
+                # Add ".bc" postfix to the original output filename
+                for i, value in enumerate(arglist):
+                    if value == "-o" and len(arglist) > i:
+                        if not arglist[i + 1].endswith(".bc"):
+                            arglist[i + 1] = "%s.bc" % arglist[i + 1]
+                # Additional arguments from command line
+                arglist = arglist + self.append_args
+                result = pool.apply_async(utils.exec_cmd, [arglist])
+                results.append(result)
+
+            # Wait for all the processes to exit
+            for result in results:
+                result.wait()
+
+        _LOGGER.debug("All compile jobs completed")
 
 
 ################################################################################
@@ -123,7 +136,8 @@ def command_line_args(scriptdir):
     parser.add_argument('--libclang', help=help, default=path)
 
     help = "File path to libclang python bindings (cindex.py)"
-    path = os.path.join(scriptdir, '/usr/lib/python3/dist-packages/clang/cindex.py')
+    path = os.path.join(
+        scriptdir, '/usr/lib/python3/dist-packages/clang/cindex.py')
     parser.add_argument('--cindexpy', help=help, default=path)
 
     help = "File path to clang binary"
