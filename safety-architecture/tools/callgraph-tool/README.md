@@ -6,7 +6,7 @@ This repository is a collection of tools for analyzing callgraphs. The tools hav
 - Allows querying and viewing function call chains from large C programs, accounting for preprocessor macros and build configurations.
 - Resolves indirect call targets based on type-analysis code from the [crix](https://github.com/umnsec/crix) program.
 
-See some example uses at: [How to visualize and query the callgraph data](./doc/query_examples.md#how-to-visualize-and-query-the-callgraph-data).
+See some example uses at: [How to use the callgraph database](./doc/query_examples.md#how-to-use-the-callgraph-database).
 
 Table of Contents
 =================
