@@ -2,12 +2,27 @@
 
 This page documents instructions and examples on how to visualize and query the callgraph database.  
 
+Table of Contents
+=================
+
+   * [How to visualize and query the callgraph data](#how-to-visualize-and-query-the-callgraph-data)
+      * [Setup](#setup)
+      * [Building kernel bitcode files with compiler optimizations disabled](#building-kernel-bitcode-files-with-compiler-optimizations-disabled)
+            * [Patch compiler_attributes.h](#patch-compiler_attributesh)
+            * [Build compilation database](#build-compilation-database)
+            * [Build bitcode files](#build-bitcode-files)
+            * [Run the crix-callgraph tool](#run-the-crix-callgraph-tool)
+      * [How to use the callgraph database](#how-to-use-the-callgraph-database)
+            * [Example: functions called by sock_recvmsg](#example-functions-called-by-sock_recvmsg)
+            * [Example: functions calling sock_recvmsg](#example-functions-calling-sock_recvmsg)
+            * [Example: visualizing syscalls calling sock_recvmsg](#example-visualizing-syscalls-calling-sock_recvmsg)
+
 ## Setup
-Follow the setup instructions from the main [README](../README.md):
+First, follow the setup instructions from the main [README](../README.md):
 - [Getting started](../README.md#getting-started)
 - [Build the crix-callgraph tool](../README.md#build-the-crix-callgrpah-tool)
 
-In these instructions we are going to use [bear](https://github.com/rizsotto/Bear) to generate the compilation database. Bear is available e.g. via Ubuntu package manager:
+Additionally, in these instructions we are going to use [bear](https://github.com/rizsotto/Bear) to generate the compilation database. Bear is available e.g. via Ubuntu package manager:
 ```
 sudo apt install bear
 ```
@@ -53,9 +68,8 @@ bear make CC=clang HOSTCC=clang -j$(nproc)
 ```
 # Run compdb2bc.py to compile .bc files, notice the --append_arg='-g -O0':
 # we want to compile with debug info and without compiler optimizations.
-# Linking the kernel binary fails with -O0, but since we
-# are not linking the binary, we can compile individual c-files to bitcode
-# with -O0:
+# Linking the kernel binary fails with -O0, but we are not linking
+# the binary, only compiling individual c-files to bitcode:
 
 cd $CG_DIR
 ./scripts/compdb2bc.py --compdb $KERNEL/compile_commands.json --v=2 \
@@ -75,7 +89,7 @@ cd $CG_DIR
 
 ./build/lib/crix-callgraph @$KERNEL/bitcodefiles.txt -o callgraph_O0.csv
 
-# Now, you can find the callgraph.csv database in `callgraph_O0.csv`
+# Now, you can find the callgraph database in `callgraph_O0.csv`
 ```
 
 ## How to use the callgraph database
@@ -98,7 +112,7 @@ Output:
 <img src=sock_recvmsg_d1.png>
 <br /><br />
 
-The output graph shows that function `sock_recvmsg` is defined in file net/socket.c on line 900. It calls three functions: `msg_data_left`, `security_socket_recvmsg`, and `sock_recvmsg_nosec`. The calls to these functions takes place from net/socket.c on lines 902, 902, and 904. The three called functions are defined in include/linux/socket.h:157, security/security.c:2127, and net/socket.c:883 respectively. Notice the node labels refer each function definition, not declaration.
+The output graph shows that function `sock_recvmsg` is defined in file net/socket.c on line 900. It calls three functions: `msg_data_left`, `security_socket_recvmsg`, and `sock_recvmsg_nosec`. The calls to these functions takes place from net/socket.c on lines 902, 902, and 904. The three called functions are defined in include/linux/socket.h:157, security/security.c:2127, and net/socket.c:883 respectively. Notice the node labels refer each function's definition, not declaration.
 
 Increasing the `--depth` argument makes the query_callgraph.py walk the call chains deeper. For instance, with `--depth 2`, the output becomes:
 
@@ -107,7 +121,7 @@ Increasing the `--depth` argument makes the query_callgraph.py walk the call cha
 
 The output now shows one function call deeper into each function call chain starting from `sock_recvmsg`.
 
-The dashed lines indicate indirect function calls: where the function call happens through a function pointer. Indirect function call targets are resolved by crix-callgraph using the Multi Layer Type Analysis (MLTA) based on the [crix](https://github.com/umnsec/crix) program.
+The dashed lines indicate indirect function calls: these are cases where the function call happens through a function pointer. Indirect function call targets are resolved by crix-callgraph using the type-analysis based on [crix](https://github.com/umnsec/crix) program.
 
 #### Example: functions calling sock_recvmsg
 To visualize the functions that can possibly call `sock_recvmsg` run the following command:
@@ -137,12 +151,12 @@ Again, increasing the `--depth` argument makes the query_callgraph.py walk the c
 <br /><br />
 
 #### Example: visualizing syscalls calling sock_recvmsg
-To visualize system calls that can possibly call `sock_recvmsg` somewhere in the call chain run the following command:
+To visualize system calls that can possibly call `sock_recvmsg` run the following command:
 
 ```
 # --csv callgraph_O0.csv: use the file callgraph_O0.csv as callgraph database file
 # --function sock_recvmsg: start from the target function 'sock_recvmsg' (exact match) 
-# --depth 5: include, at most, five levels of function calls from 'sock_recvmsg'
+# --depth 4: include, at most, four levels of function calls from 'sock_recvmsg'
 # --until_function '__x64_sys': stop drawing the call chain if the function name
                                 matches regular expression '__x64_sys'
 # --colorize: colorize graph node if function name matches the given regular expression
@@ -158,7 +172,7 @@ cd $CG_DIR
 --out sock_recvmsg_syscalls.png --inverse
 ```
 
-We use the `--until_function` to stop drawing when the call chain reaches a function call whose name looks like a system call. Also, we use the `--colorize` to highlight such function calls. The `--merge_edges` is used to reduce noice by including only one association between two function calls for cases where there would be many.
+We use the `--until_function` to stop drawing when the call chain reaches a function call whose name looks like a system call. Also, we use the `--colorize` to highlight such function calls. The `--merge_edges` is used to reduce noise by including only one association between two function calls for cases where there would be many.
 
 <img src=sock_recvmsg_syscalls.png>
 <br /><br />
