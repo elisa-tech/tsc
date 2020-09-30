@@ -15,6 +15,7 @@ Table of Contents
     * [Example: functions called by sock_recvmsg](#example-functions-called-by-sock_recvmsg)
     * [Example: functions calling sock_recvmsg](#example-functions-calling-sock_recvmsg)
     * [Example: visualizing syscalls calling sock_recvmsg](#example-visualizing-syscalls-calling-sock_recvmsg)
+    * [Example: visualizing coverage data](#example-visualizing-coverage-data)
 
 ## Setup
 To begin, make sure you have gone through the following the setup instructions from the main [README](../README.md):
@@ -92,6 +93,8 @@ cd $CG_DIR
 ```
 
 ## How to use the callgraph database
+
+Below examples were produced from x86_64_defconfig build, using v5.8.7 stable kernel tree.
 
 #### Example: functions called by sock_recvmsg
 To visualize the functions called by `sock_recvmsg` run the following command:
@@ -177,3 +180,35 @@ We use the `--until_function` to stop drawing when the call chain reaches a func
 <br /><br />
 
 The output graph shows that there are three syscalls whose call chain might reach `sock_recvmsg`: `__x64_sys_recvfrom`, `__x64_sys_recv`, and `__x64_sys_socketcall` defined at net/socket.c:2066, net/socket.c:2077, and net/socket.c:2852 respectively.
+
+#### Example: visualizing coverage data 
+query_callgraph.py allows adding function coverage information to the graph visualizations. The expected coverage format is a csv file with the following headers: filename, function, and percent:
+```
+# Example of coverage data expected format:
+head -n2 function_coverage.csv 
+
+filename,function,percent
+/path-to-linux/mm/mmap.c,may_expand_vm,25
+
+```
+
+To add coverage data to the graph visualization, specify the coverage data file with `--coverage_file` argument:
+
+```
+# --csv callgraph_O0.csv: use the file callgraph_O0.csv as callgraph database file
+# --function sock_recvmsg: start from the target function 'sock_recvmsg' (exact match) 
+# --depth 2: include the second-level function calls from 'sock_recvmsg'
+# --edge_labels: add caller source line numbers to the graph
+# --out sock_recvmsg_d2_coverage.png: output png-image with the given filename
+# --coverage_file function_coverage.csv: use the given file to add coverage data
+
+cd $CG_DIR
+./scripts/query_callgraph.py --csv callgraph_O0.csv --function sock_recvmsg --depth 2 \
+--edge_labels --out sock_recvmsg_d2_coverage.png --coverage_file function_coverage.csv
+```
+Output:
+
+<img src=sock_recvmsg_d2_coverage.png>
+<br /><br />
+
+Notice that the coverage data must be from the same build as the callgraph database, otherwise the results will not be relevant.
