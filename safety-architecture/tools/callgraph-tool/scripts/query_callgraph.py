@@ -13,7 +13,7 @@ import pandas as pd
 import re
 import utils
 from collections import OrderedDict
-from typing import NamedTuple
+from difflib import SequenceMatcher
 
 ################################################################################
 
@@ -56,7 +56,7 @@ DBG_INDENT = "    "
 class Grapher():
 
     def __init__(self, csvfile):
-        self.df = df_from_csv_file(csvfile)
+        self._load_callgraph_data(csvfile)
         self.digraph = None
         # Key: node name, Value: list of labels associated to node name
         self.nodelabels = {}
@@ -72,6 +72,7 @@ class Grapher():
         self.inverse = False
         self.until_func_regex = None
         self.colorize_regex = None
+        self.df_cov = None
 
     def graph(self, args):
         self._is_csv_out(args.out)
@@ -89,6 +90,9 @@ class Grapher():
                 "discarding 'edge_labels'"
             )
             self.edge_labels = False
+
+        if args.coverage_file is not None:
+            self._load_coverage_data(args.coverage_file)
 
         concentrate = 'true' if self.merge_edges else 'false'
         self.digraph = gv.Digraph(filename=args.out)
@@ -118,6 +122,81 @@ class Grapher():
         # Output csv
         if self.df_out_csv is not None and not self.df_out_csv.empty:
             df_to_csv_file(self.df_out_csv, args.out)
+
+    def _load_callgraph_data(self, filename):
+        utils.exit_unless_accessible(filename)
+        self.df = pd.read_csv(filename, na_values=[''], keep_default_na=False)
+        self.df.reset_index(drop=True, inplace=True)
+        self.df.columns = self.df.columns.str.lower()
+        require_cols = [
+            'caller_function',
+            'caller_filename',
+            'caller_def_line',
+            'caller_line',
+            'callee_function',
+            'callee_filename',
+            'callee_line',
+        ]
+        if not all(x in list(self.df.columns.values) for x in require_cols):
+            _LOGGER.error(
+                "Callgraph database '%s' missing some required headers: %s" % (
+                    filename, require_cols))
+            exit()
+
+    def _load_coverage_data(self, filename):
+        utils.exit_unless_accessible(filename)
+        self.df_cov = pd.read_csv(filename, sep=None, engine='python')
+        self.df_cov.reset_index(drop=True, inplace=True)
+        self.df_cov.columns = self.df_cov.columns.str.lower()
+        require_cols = ['function', 'filename']
+        if not all(x in list(self.df_cov.columns.values) for x in require_cols):
+            _LOGGER.error(
+                "Coverage file '%s' missing some required headers: %s" % (
+                    filename, require_cols))
+            exit()
+        if self.df_cov.isnull().values.any():
+            _LOGGER.error(
+                "Empty values in coverage data: %s" % filename)
+            exit()
+
+        # Normalize paths in the callgraph database.
+        # This operation takes some time, so we don't do it in the suspected
+        # usual case - when coverage data is not provided. However, when
+        # coverage data _is_ provided, we need to normalize the filename
+        # paths also in the callgraph database so that they become comparable
+        # to filename paths in the coverage data.
+        self.df['caller_filename'] = self.df[
+            'caller_filename'].map(lambda a: os.path.normpath(a))
+        self.df['callee_filename'] = self.df[
+            'callee_filename'].map(lambda a: os.path.normpath(a))
+
+        # Normalize paths in the coverage data
+        self.df_cov['filename'] = self.df_cov[
+            'filename'].map(lambda a: os.path.normpath(a))
+
+        # Adjust filenames in coverage data to make them relative to
+        # the kernel tree directory. This needs to be done so that the
+        # filename paths in coverage data become comparable to the
+        # filename paths in the callgraph database:
+
+        example_cov_file = self.df_cov['filename'].iloc[0]
+        example_cov_func = self.df_cov['function'].iloc[0]
+        df = self.df[(self.df['caller_function'] == example_cov_func)]
+        example_cg_file = df['caller_filename'].iloc[0]
+
+        match = SequenceMatcher(
+            None,
+            example_cg_file,
+            example_cov_file).find_longest_match(
+                0, len(example_cg_file), 0, len(example_cov_file))
+        if not match or match.b == 0:
+            return
+
+        cov_file_extra_prefix = example_cov_file[0:match.b]
+        _LOGGER.debug("Filenames in coverage data are not relative, "
+                      "removing filename prefix: %s" % cov_file_extra_prefix)
+        self.df_cov['filename'] = self.df_cov['filename'].str.replace(
+            cov_file_extra_prefix, "")
 
     def _is_csv_out(self, filename):
         _fname, extension = os.path.splitext(filename)
@@ -250,6 +329,10 @@ class Grapher():
         labels = self.nodelabels.setdefault(node_name, [])
         # Add filename as new label
         labels.append("%s:%s" % (filename, line))
+        # Add coverage pct as label
+        fillcolor, pct = self._get_coverage_data(filename, function)
+        if pct:
+            labels.append(pct)
         # Remove possible duplicate labels, preserving order
         labels = list(OrderedDict.fromkeys(labels))
         # Build the html label: function name on the first line followed by
@@ -257,12 +340,38 @@ class Grapher():
         beg = "<FONT POINT-SIZE=\"10\">"
         end = "</FONT>"
         label = "<%s<BR/>%s%s%s>" % (function, beg, "<BR/>".join(labels), end)
-        fillcolor = '#EEEEEE'
         if regex_match(self.colorize_regex, function):
             fillcolor = "#FFE6E6"
+        elif not fillcolor:
+            fillcolor = '#EEEEEE'
         # Add node to the graph
         self.digraph.node(
             node_name, label, style='rounded,filled', fillcolor=fillcolor)
+
+    def _get_coverage_data(self, filename, function):
+        pct = None
+        fillcolor = None
+        if self.df_cov is None:
+            return fillcolor, pct
+        df = self.df_cov[
+            (self.df_cov['function'] == function) &
+            (self.df_cov['filename'] == filename)]
+        if df.empty:
+            pct = "\ncoverage: (no coverage info)"
+        elif ('percent' not in list(df.columns.values)):
+            pct = ""
+        elif df.shape[0] == 1:
+            val = pd.to_numeric(df['percent'], errors='coerce').values[0]
+            if not pd.isna(val):
+                pct = "\ncoverage: %s%%" % (int(round(val)))
+                fillcolor = gradient(val)
+            else:
+                pct = "\ncoverage: NAN"
+        elif df.shape[0] > 1:
+            pct = "\ncoverage: (unknown)"
+            _LOGGER.error("%s:%s matches multiple rows" % (filename, function))
+
+        return fillcolor, pct
 
     def _dbg_print_row(self, row, depth):
         _LOGGER.debug(
@@ -272,13 +381,31 @@ class Grapher():
                 row.callee_filename, row.callee_function, row.callee_line,
                 row.callee_calltype))
 
+
 ################################################################################
 
 
-def df_from_csv_file(name):
-    df = pd.read_csv(name, na_values=[''], keep_default_na=False)
-    df.reset_index(drop=True, inplace=True)
-    return df
+GRADIENT_LIST = []
+
+
+def gradient_list_generate():
+    r1, g1, b1 = (255, 140, 140)
+    r2, g2, b2 = (90, 215, 140)
+    steps = int(100 + 1)
+    rd, gd, bd = (r2-r1)/steps, (g2-g1)/steps, (b2-b1)/steps
+    for _step in range(steps):
+        r1 += rd
+        g1 += gd
+        b1 += bd
+        hex = "#%02x%02x%02x" % (int(r1), int(g1), int(b1))
+        GRADIENT_LIST.append(hex)
+
+
+def gradient(pct):
+    if pct < 0 or pct > 100:
+        _LOGGER.error("Invalid percentage value: %s" % pct)
+        exit()
+    return GRADIENT_LIST[int(pct)]
 
 
 def df_to_csv_file(df, name):
@@ -357,8 +484,12 @@ def getargs():
         "or when the specified call chain depth is reached."
     parser.add_argument('--until_function', help=help)
 
-    help = "Colorize functions that match the specified regural expression."
+    help = "Colorize functions that match the specified regular expression."
     parser.add_argument('--colorize', help=help)
+
+    help = "Include function coverage data into the graph from the specified "\
+        "file."
+    parser.add_argument('--coverage_file', help=help)
 
     help = "Set the verbose level (defaults to --v=1)"
     parser.add_argument('--verbose', help=help, type=int, default=1)
@@ -374,6 +505,7 @@ if __name__ == "__main__":
 
     utils.exit_unless_accessible(args.csv)
     utils.setup_logging(verbosity=args.verbose)
+    gradient_list_generate()
 
     _LOGGER.info("reading input csv")
     g = Grapher(args.csv)
