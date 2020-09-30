@@ -139,9 +139,9 @@ class Grapher():
         ]
         if not all(x in list(self.df.columns.values) for x in require_cols):
             _LOGGER.error(
-                "Callgraph database '%s' missing some required headers: %s" % (
+                "Callgraph database '%s' missing required headers: %s" % (
                     filename, require_cols))
-            exit()
+            exit(1)
 
     def _load_coverage_data(self, filename):
         utils.exit_unless_accessible(filename)
@@ -151,13 +151,13 @@ class Grapher():
         require_cols = ['function', 'filename']
         if not all(x in list(self.df_cov.columns.values) for x in require_cols):
             _LOGGER.error(
-                "Coverage file '%s' missing some required headers: %s" % (
+                "Coverage file '%s' missing required headers: %s" % (
                     filename, require_cols))
-            exit()
+            exit(1)
         if self.df_cov.isnull().values.any():
             _LOGGER.error(
                 "Empty values in coverage data: %s" % filename)
-            exit()
+            exit(1)
 
         # Normalize paths in the callgraph database.
         # This operation takes some time, so we don't do it in the suspected
@@ -181,16 +181,26 @@ class Grapher():
 
         example_cov_file = self.df_cov['filename'].iloc[0]
         example_cov_func = self.df_cov['function'].iloc[0]
-        df = self.df[(self.df['caller_function'] == example_cov_func)]
-        example_cg_file = df['caller_filename'].iloc[0]
 
+        df = self.df[(self.df['caller_function'] == example_cov_func)]
+        if df.empty:
+            _LOGGER.error(
+                "Function '%s' in coverage data is not "
+                "in the callgraph database. Is the coverage file "
+                "from the same build as the callgraph database?"
+                % example_cov_func)
+            exit(1)
+
+        example_cg_file = df['caller_filename'].iloc[0]
         match = SequenceMatcher(
             None,
             example_cg_file,
             example_cov_file).find_longest_match(
                 0, len(example_cg_file), 0, len(example_cov_file))
         if not match or match.b == 0:
-            return
+            _LOGGER.error(
+                "Unexpected filename in coverage data: '%s'" % example_cov_file)
+            exit(1)
 
         cov_file_extra_prefix = example_cov_file[0:match.b]
         _LOGGER.debug("Filenames in coverage data are not relative, "
@@ -404,7 +414,7 @@ def gradient_list_generate():
 def gradient(pct):
     if pct < 0 or pct > 100:
         _LOGGER.error("Invalid percentage value: %s" % pct)
-        exit()
+        exit(1)
     return GRADIENT_LIST[int(pct)]
 
 
