@@ -85,7 +85,7 @@ cd $CG_DIR
 
 # To generate a callgraph database using the .bc files listed in
 # $KERNEL/bitcodefiles.txt as input, run crix-callgraph as follows
-# (the @-notation that allows specifying a list of input .bc files)
+# (the @-notation allows specifying a list of input .bc files)
 
 ./build/lib/crix-callgraph @$KERNEL/bitcodefiles.txt -o callgraph_O0.csv
 

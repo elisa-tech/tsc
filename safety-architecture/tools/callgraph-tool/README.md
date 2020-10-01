@@ -1,10 +1,13 @@
 
 # Callgraph
 
-This repository is a collection of tools for analyzing callgraphs. The tools have been developed mainly to target Linux Kernel, but they should work with any C target programs. Main higlights include:
-- Scales well to large programs, does not require excessive resources. Finds direct and indirect function calls from an example x86_64_defconfig kernel build in less than one minute on a typical laptop with 16GB RAM.
-- Allows querying and viewing function call chains from large C programs, accounting for preprocessor macros and build configurations.
+This repository is a collection of tools for constructing and analyzing callgraphs. The tools have been developed mainly to target Linux Kernel, but they should work with any target C programs that can be compiled with clang. Main highlights include:
+- Constructs a precise global callgraph.
+- Builds on top of LLVM.
+- Input is LLVM assembly (IR): generated callgraph reflects the compilation configurations. For instance, build configuration and compiler optimization levels impact the output callgraph.
 - Resolves indirect call targets based on type-analysis code from the [crix](https://github.com/umnsec/crix) program.
+- Scales well to large programs, does not require excessive resources. Finds direct and indirect function calls from an example Linux x86_64_defconfig kernel build in less than two minutes on a laptop with 8GB RAM and a SSD drive.
+- Allows effectively querying and viewing function call chains from large C programs.
 
 See some example uses at: [How to use the callgraph database](./doc/query_examples.md#how-to-use-the-callgraph-database).
 
@@ -32,17 +35,19 @@ CG_DIR=$(pwd)/workgroups/safety-architecture/tools/callgraph-tool
 
 Install the following requirements:
 ```
-sudo apt install python3 python3-pip build-essential cmake libstdc++-8-dev \
+sudo apt install python3 python3-pip build-essential cmake \
 clang-10 python3-clang-10 llvm-10 llvm-10-dev clang-format-10 graphviz
 ```
 
 In addition, the scripts rely on python packages specified in requirements.txt. You can install the required packages with:
 ```
+cd $CG_DIR
 pip3 install -r requirements.txt
 ```
 
 You also need the target kernel source tree. For the sake of example, we use the mainline tree:
 ```
+cd ~   # wherever you prefer to clone the kernel tree to
 git clone https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
 
 # We assume $KERNEL contains the path to the target kernel tree root
@@ -53,7 +58,7 @@ KERNEL=$(pwd)/linux
 To make use of the tool, you first need to generate callgraph database relevant for your kernel source tree and build configuration.
 
 #### Build the crix-callgraph tool
-We are going to use crix-callgraph to build the callgraph database. Crix-callgraph is based on the callgraph code from the [crix](https://github.com/umnsec/crix) program. The tool was build on top of crix version: https://github.com/umnsec/crix/commit/13d3e5574aaaae07d93ae5d1fc5f46c9487992ba.
+We are going to use crix-callgraph to build the callgraph database. Crix-callgraph is based on callgraph code from the [crix](https://github.com/umnsec/crix) program. The tool was build on top of crix version: https://github.com/umnsec/crix/commit/13d3e5574aaaae07d93ae5d1fc5f46c9487992ba.
 
 To compile crix-callgraph, run:
 ```
@@ -81,7 +86,7 @@ source $CG_DIR/env.sh
 
 # Clean
 make clean && make mrproper
-# Clean the generated bitcode files manually
+# Clean any prior generated bitcode files manually
 find . -type f -name ".*.bc" -and ! -name "timeconst.bc" -delete
 
 # Generate defconfig
@@ -106,7 +111,7 @@ cd $CG_DIR
 
 # To generate a callgraph database using the .bc files listed in
 # $KERNEL/bitcodefiles.txt as input, run crix-callgraph as follows
-# (the @-notation that allows specifying a list of input .bc files)
+# (the @-notation allows specifying a list of input .bc files)
 ./build/lib/crix-callgraph @$KERNEL/bitcodefiles.txt
 
 # Now, you can find the callgraph.csv database in `callgraph.csv`

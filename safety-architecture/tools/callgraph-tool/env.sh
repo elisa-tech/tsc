@@ -11,4 +11,4 @@ fi
 export LLVM_COMPILER=clang
 export WLLVM_OUTPUT_LEVEL=WARNING
 export WLLVM_OUTPUT_FILE=/tmp/wrapper.log
-export PATH=${CLANG_BIN_DIR}:${PATH}
+export PATH=${CLANG_BIN_DIR}:${PATH}:${HOME}/.local/bin/
