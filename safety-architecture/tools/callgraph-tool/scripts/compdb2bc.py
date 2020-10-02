@@ -111,8 +111,12 @@ def command_line_args(scriptdir):
     parser = argparse.ArgumentParser()
 
     desc = \
-        "Script generates bitcode files based on compilation database "\
-        "(compile_commands.json)."
+        "Script generates bitcode files given a compilation database "\
+        "COMPDB. It writes the output bitcode files to where the original "\
+        "object files were written. Option --append_arg allows specifying "\
+        "additional build arguments, or to overwrite original build "\
+        "arguments. Notice the script only builds individual source "\
+        "files to bitcode without linking them."
 
     epil = "Example: ./%s --compdb ~/linux-stable/compile_commands.json" % \
         os.path.basename(__file__)

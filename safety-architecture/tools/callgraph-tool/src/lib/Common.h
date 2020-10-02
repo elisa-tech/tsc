@@ -34,7 +34,6 @@ using namespace std;
     if (DEBUG)                                                                 \
       fprintf(DSTREAM, "[%s:%d]: " fmt, __func__, __LINE__, __VA_ARGS__);      \
   } while (0)
-#define DEBUG_SPAM 2
 
 //
 // Common functions

@@ -133,6 +133,9 @@ int main(int argc, char **argv) {
     if (M == NULL) {
       OP << argv[0] << ": error loading file '" << InputFilenames[i] << "'\n";
       continue;
+    } else if (M->getNamedMetadata("llvm.dbg.cu") == NULL) {
+      OP << argv[0] << ": warning: debug info missing: " << M->getName()
+         << "\n";
     }
 
     Module *Module = M.release();

@@ -159,7 +159,7 @@ def test_csv_graph_inverse(set_up_test_data):
     cmd = [
         QUERY_CG,
         "--csv", callgraph_csv,
-        "--function", "say_hello",
+        "--function", "printf",
         "--depth", "10",
         "--inverse",
         "--out", query_out_inverse
@@ -206,7 +206,7 @@ def test_csv_graph_duplicate(set_up_test_data):
     cmd = [
         QUERY_CG,
         "--csv", callgraph_csv,
-        "--function", "say_hello",
+        "--function", "printf",
         "--depth", "10",
         "--inverse",
         "--out", query_out_inverse

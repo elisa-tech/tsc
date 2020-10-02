@@ -57,12 +57,12 @@ CallGraphDebugInfo readDebugInfo(CallInst *caller_cinst,
   struct CallGraphDebugInfo info;
   Instruction *caller_inst = dyn_cast<Instruction>(caller_cinst);
   if (!caller_inst) {
-    llvm::errs() << "Warning: caller_cinst is not an Instruction\n";
+    // llvm::errs() << "Warning: caller_cinst is not an Instruction\n";
     return info;
   }
   const llvm::DebugLoc &debugInfo = caller_inst->getDebugLoc();
   if (!debugInfo) {
-    llvm::errs() << "Warning: missing debug info\n";
+    // llvm::errs() << "Warning: missing debug info\n";
     return info;
   }
 
@@ -107,53 +107,47 @@ void CallGraphPass::printCallGraphRow(CallInst *caller_cinst,
 
   string callee_line = "";
   string callee_name = "";
-  string callee_fn = "";
+  string callee_filename = "";
 
   if (callee_func) {
-    DISubprogram *callee_sp = callee_func->getSubprogram();
-    if (!callee_sp) {
-      // llvm::errs() << "Warning: missing debug info: callee_function: "
-      //	<< callee_func->getName() << "\n";
-      return;
-    }
-    callee_line = to_string(callee_sp->getLine());
     callee_name = callee_func->getName();
-    callee_fn = callee_sp->getFilename().str();
+    DISubprogram *callee_sp = callee_func->getSubprogram();
+    if (callee_sp) {
+      callee_line = to_string(callee_sp->getLine());
+      callee_filename = callee_sp->getFilename().str();
+    }
   }
+
+  string caller_line = "";
+  string caller_name = "";
+  string caller_filename = "";
+  string caller_line_funcdef = "";
 
   Function *caller_func = caller_cinst->getCaller();
-  DISubprogram *caller_sp = caller_func->getSubprogram();
-  if (!caller_sp) {
-    // llvm::errs() << "Warning: missing debug info: caller_function: "
-    //	<< caller_func->getName() << "\n";
-    return;
+  if (caller_func) {
+    caller_name = caller_func->getName();
+    DISubprogram *caller_sp = caller_func->getSubprogram();
+    if (caller_sp) {
+      caller_line_funcdef = to_string(caller_sp->getLine());
+      caller_filename = caller_sp->getFilename().str();
+    } else if (Module *m = caller_func->getParent()) {
+      caller_filename = m->getSourceFileName();
+    }
   }
-  int caller_line_funcdef = caller_sp->getLine();
-  string caller_name = caller_func->getName();
-  string caller_fn = caller_sp->getFilename().str();
-  CallGraphDebugInfo info = readDebugInfo(caller_cinst, caller_fn);
+
+  CallGraphDebugInfo info = readDebugInfo(caller_cinst, caller_filename);
 
   Ctx->csvout << ""
-              << "\"" << caller_fn << "\""
-              << ","
-              << "\"" << caller_name << "\""
-              << ","
-              << "\"" << caller_line_funcdef << "\""
-              << ","
-              << "\"" << info.caller_line << "\""
-              << ","
-              << "\"" << callee_fn << "\""
-              << ","
-              << "\"" << callee_name << "\""
-              << ","
-              << "\"" << callee_line << "\""
-              << ","
-              << "\"" << callee_type << "\""
-              << ","
-              << "\"" << info.callee_inlined_from_file << "\""
-              << ","
-              << "\"" << info.callee_inlined_from_line << "\""
-              << ","
+              << "\"" << caller_filename << "\","
+              << "\"" << caller_name << "\","
+              << "\"" << caller_line_funcdef << "\","
+              << "\"" << info.caller_line << "\","
+              << "\"" << callee_filename << "\","
+              << "\"" << callee_name << "\","
+              << "\"" << callee_line << "\","
+              << "\"" << callee_type << "\","
+              << "\"" << info.callee_inlined_from_file << "\","
+              << "\"" << info.callee_inlined_from_line << "\","
               << "\"" << indirect_found_with << "\""
               << "\n";
 }
@@ -321,7 +315,7 @@ bool CallGraphPass::typeConfineInStore(StoreInst *SI) {
     }
   }
 
-  // Cast 2: value-based store
+  // Case 2: value-based store
   // A composite-type object is stored
   Type *EPTy = dyn_cast<PointerType>(PO->getType())->getElementType();
   Type *VTy = VO->getType();
@@ -329,8 +323,7 @@ bool CallGraphPass::typeConfineInStore(StoreInst *SI) {
     if (isCompositeType(EPTy)) {
       return true;
     } else {
-      if (DEBUG >= DEBUG_SPAM)
-        LOG_OBJ("StoreInst (Case2): ", SI);
+      LOG_OBJ("StoreInst (Case2): ", SI);
       escapeType(EPTy);
       return false;
     }
@@ -358,8 +351,7 @@ bool CallGraphPass::typeConfineInStore(StoreInst *SI) {
       // Example: mm/mempool.c +188: pool->free = free_fn;
       // free_fn is a function pointer from an function
       // argument
-      if (DEBUG >= DEBUG_SPAM)
-        LOG_OBJ("StoreInst (Case3): ", SI);
+      LOG_OBJ("StoreInst (Case3): ", SI);
       escapeType(STy, Idx);
       return false;
     }
@@ -394,8 +386,7 @@ bool CallGraphPass::typeConfineInCast(CastInst *CastI) {
 }
 
 void CallGraphPass::escapeType(Type *Ty, int Idx) {
-  if (DEBUG >= DEBUG_SPAM)
-    LOG_OBJ("Type: ", Ty);
+  LOG_OBJ("Type: ", Ty);
   if (Idx == -1)
     typeEscapeSet.insert(typeHash(Ty));
   else
@@ -404,10 +395,8 @@ void CallGraphPass::escapeType(Type *Ty, int Idx) {
 
 void CallGraphPass::transitType(Type *ToTy, Type *FromTy, int ToIdx,
                                 int FromIdx) {
-  if (DEBUG >= DEBUG_SPAM)
-    LOG_OBJ("ToType: ", ToTy);
-  if (DEBUG >= DEBUG_SPAM)
-    LOG_OBJ("FromType: ", FromTy);
+  LOG_OBJ("ToType: ", ToTy);
+  LOG_OBJ("FromType: ", FromTy);
   if (ToIdx != -1 && FromIdx != -1)
     typeTransitMap[typeIdxHash(ToTy, ToIdx)].insert(
         typeIdxHash(FromTy, FromIdx));
@@ -475,8 +464,7 @@ Value *CallGraphPass::nextLayerBaseType(Value *V, Type *&BTy, int &Idx,
 
 bool CallGraphPass::findCalleesWithMLTA(CallInst *CI, FuncSet &FS) {
 
-  if (DEBUG >= DEBUG_SPAM)
-    LOG_OBJ("CallInst: ", CI);
+  LOG_OBJ("CallInst: ", CI);
 
   // Initial set: first-layer results
   FuncSet FS1 = Ctx->sigFuncsMap[callHash(CI)];
@@ -614,7 +602,7 @@ bool CallGraphPass::doInitialization(Module *M) {
     }
   }
 
-  if (DEBUG >= DEBUG_SPAM) {
+  if (DEBUG) {
     ostringstream os;
     LOG("typeFuncsMap:");
     for (auto const &pair : typeFuncsMap) {
@@ -647,10 +635,12 @@ bool CallGraphPass::doModulePass(Module *M) {
   for (Module::iterator f = M->begin(), fe = M->end(); f != fe; ++f) {
 
     Function *F = &*f;
+    LOG_FMT("Function: %s\n", F->getName().str().c_str());
 
     size_t fh = funcHash(F);
     Function *UF = Ctx->UnifiedFuncMap[fh];
     if (!UF) {
+      LOG("Not in UnifiedFuncMap, skipping");
       continue;
     }
 
@@ -658,6 +648,11 @@ bool CallGraphPass::doModulePass(Module *M) {
     for (inst_iterator i = inst_begin(F), e = inst_end(F); i != e; ++i) {
       // Map callsite to possible callees.
       if (CallInst *CI = dyn_cast<CallInst>(&*i)) {
+        LOG_OBJ("CallInst: ", CI);
+        if (IntrinsicInst *II = dyn_cast<IntrinsicInst>(CI)) {
+          LOG("Skipping llvm internal function");
+          continue;
+        }
 
         CallSite CS(CI);
         FuncSet FS;
@@ -669,6 +664,7 @@ bool CallGraphPass::doModulePass(Module *M) {
         string indirectFoundWith = "";
         // Indirect call
         if (CS.isIndirectCall()) {
+          LOG("Inidirect call");
           if (Ctx->analysisType == ta_only) {
             findCalleesWithType(CI, FS);
             indirectFoundWith = "TA";
@@ -687,21 +683,26 @@ bool CallGraphPass::doModulePass(Module *M) {
         }
         // Direct call
         else {
+          LOG("Direct call");
           // not InlineAsm
           if (CF) {
             // Call external functions
             if (CF->empty()) {
+              LOG("Extrenal function call");
               StringRef FName = CF->getName();
               if (FName.startswith("SyS_"))
                 FName = StringRef("sys_" + FName.str().substr(4));
               if (Function *GF = Ctx->GlobalFuncs[FName])
                 CF = GF;
             }
+            LOG_FMT("Called function: %s\n", CF->getName().str().c_str());
             // Use unified function
             size_t fh = funcHash(CF);
             Function *UF = Ctx->UnifiedFuncMap[fh];
             if (UF) {
               printCallGraphRow(CI, UF, "direct", "");
+            } else {
+              printCallGraphRow(CI, CF, "direct", "");
             }
           }
           // InlineAsm
