@@ -87,6 +87,10 @@ class BitcodeCompiler():
                 # Add arguments: -c -emit-llvm
                 arglist.insert(1, "-c")
                 arglist.insert(2, "-emit-llvm")
+                if cc.filename.lower().endswith('.s'):
+                    _LOGGER.warning(
+                        "Ignoring assembly source file: %s" % cc.filename)
+                    continue
                 # Add ".bc" postfix to the original output filename
                 for i, value in enumerate(arglist):
                     if value == "-o" and len(arglist) > i:
