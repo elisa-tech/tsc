@@ -690,8 +690,6 @@ bool CallGraphPass::doModulePass(Module *M) {
             if (CF->empty()) {
               LOG("Extrenal function call");
               StringRef FName = CF->getName();
-              if (FName.startswith("SyS_"))
-                FName = StringRef("sys_" + FName.str().substr(4));
               if (Function *GF = Ctx->GlobalFuncs[FName])
                 CF = GF;
             }
