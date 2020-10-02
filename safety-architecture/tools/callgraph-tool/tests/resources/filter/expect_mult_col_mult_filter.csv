@@ -1,0 +1,7 @@
+"caller_filename","caller_function","caller_def_line","caller_line","callee_filename","callee_function","callee_line","callee_calltype","callee_inlined_from_file","callee_inlined_from_line","indirect_found_with"
+"mm/readahead.c","ondemand_readahead","440","491","mm/kasan/generic_report.c","__asan_report_store8_noabort","152","direct","","",""
+"kernel/trace/trace_stat.c","stat_seq_show","214","222","net/ipv4/udp.c","udp4_seq_show","2986","indirect","","","MLTA"
+"drivers/pci/pci.c","pci_dev_save_and_disable","4961","4972","arch/x86/pci/fixup.c","sb600_hpet_quirk","527","indirect","","","MLTA"
+"drivers/base/regmap/regmap.c","_regmap_raw_write_impl","1466","1573","fs/locks.c","filelock_init","3006","indirect","","","TA"
+"kernel/time/alarmtimer.c","alarm_start","356","367","lib/zstd/decompress.c","ZSTD_DStreamOutSize","2278","indirect","","","MLTA"
+"include/linux/refcount.h","refcount_sub_and_test","264","266","include/asm-generic/atomic-instrumented.h","atomic_fetch_sub_release","218","direct","","",""
