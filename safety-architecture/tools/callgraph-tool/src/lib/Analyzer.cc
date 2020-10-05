@@ -22,10 +22,10 @@ cl::list<string> InputFilenames(cl::Positional, cl::OneOrMore,
 
 cl::OptionCategory CallgraphCategory("Callgraph Options");
 
-cl::opt<string> optOutFilename("o", cl::desc("Specify output CSV filename"),
-                               cl::value_desc("filename"),
-                               cl::init("callgraph.csv"),
-                               cl::cat(CallgraphCategory));
+cl::opt<string> optOutFilename(
+    "o", cl::desc("Specify output CSV filename (default='callgraph.csv)"),
+    cl::value_desc("filename"), cl::init("callgraph.csv"),
+    cl::cat(CallgraphCategory));
 
 cl::opt<AnalysisType> optAnalysisType(
     cl::desc("Resolve indirect call targets with:"),
@@ -101,7 +101,29 @@ int main(int argc, char **argv) {
   llvm_shutdown_obj Y; // Call llvm_shutdown() on exit.
 
   cl::HideUnrelatedOptions(CallgraphCategory);
-  cl::ParseCommandLineOptions(argc, argv, "Crix Callgraph\n");
+  cl::ParseCommandLineOptions(
+      argc, argv,
+      "\n\n"
+      "  Generate precise global callgraph given input bitcode files\n\n"
+      "EXAMPLES:\n\n"
+      "  - Generate callgraph given input file '/path/to/foo.bc', write output "
+      "to default output file 'callgraph.csv':\n"
+      "    crix-callgraph /path/to/foo.bc"
+      "\n\n"
+      "  - Generate callgraph given two input files '/path/to/foo.bc' and "
+      "'/path/to/bar.bc', write output "
+      "to 'foobar.csv':\n"
+      "    crix-callgraph /path/to/foo.bc /path/to/bar.bc -o foobar.csv"
+      "\n\n"
+      "  - Generate callgraph given a text file with a list of input files "
+      "'/path/to/foobar.txt' containing one bitcode input file per line, write "
+      "output "
+      "to 'foobar.csv':\n"
+      "    crix-callgraph @/path/to/foobar.txt -o foobar.csv"
+      "\n\n"
+
+  );
+
   GlobalCtx.analysisType = optAnalysisType;
   GlobalCtx.csvout.open(optOutFilename);
   SMDiagnostic Err;
