@@ -165,14 +165,18 @@ class Grapher():
         # coverage data _is_ provided, we need to normalize the filename
         # paths also in the callgraph database so that they become comparable
         # to filename paths in the coverage data.
+
         self.df['caller_filename'] = self.df[
-            'caller_filename'].map(lambda a: os.path.normpath(a))
+            'caller_filename'].map(
+                lambda a: a if pd.isnull(a) else os.path.normpath(a))
         self.df['callee_filename'] = self.df[
-            'callee_filename'].map(lambda a: os.path.normpath(a))
+            'callee_filename'].map(
+                lambda a: a if pd.isnull(a) else os.path.normpath(a))
 
         # Normalize paths in the coverage data
         self.df_cov['filename'] = self.df_cov[
-            'filename'].map(lambda a: os.path.normpath(a))
+            'filename'].map(
+                lambda a: a if pd.isnull(a) else os.path.normpath(a))
 
         # Adjust filenames in coverage data to make them relative to
         # the kernel tree directory. This needs to be done so that the
