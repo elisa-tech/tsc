@@ -2,15 +2,6 @@
 #define COMMON_H
 
 #include <llvm/Analysis/TargetLibraryInfo.h>
-#include <llvm/IR/DebugInfo.h>
-#include <llvm/IR/Module.h>
-#include <llvm/Support/CommandLine.h>
-#include <llvm/Support/raw_ostream.h>
-
-#include <bitset>
-#include <chrono>
-#include <stdio.h>
-#include <unistd.h>
 
 using namespace llvm;
 using namespace std;
