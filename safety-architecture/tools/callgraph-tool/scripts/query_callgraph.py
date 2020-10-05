@@ -184,33 +184,19 @@ class Grapher():
         # filename paths in the callgraph database:
 
         example_cov_file = self.df_cov['filename'].iloc[0]
-        example_cov_func = self.df_cov['function'].iloc[0]
 
-        df = self.df[(self.df['caller_function'] == example_cov_func)]
+        # Warn if it looks like filepaths don't match between the
+        # coverage data and the callgraph data.
+        # Possible reasons include:
+        # - Absolute vs relative filepaths
+        # - Coverage data is from different build compared to callgraph data
+        df = self.df[(self.df['caller_filename'] == example_cov_file)]
         if df.empty:
-            _LOGGER.error(
-                "Function '%s' in coverage data is not "
-                "in the callgraph database. Is the coverage file "
-                "from the same build as the callgraph database?"
-                % example_cov_func)
-            exit(1)
-
-        example_cg_file = df['caller_filename'].iloc[0]
-        match = SequenceMatcher(
-            None,
-            example_cg_file,
-            example_cov_file).find_longest_match(
-                0, len(example_cg_file), 0, len(example_cov_file))
-        if not match or match.b == 0:
-            _LOGGER.error(
-                "Unexpected filename in coverage data: '%s'" % example_cov_file)
-            exit(1)
-
-        cov_file_extra_prefix = example_cov_file[0:match.b]
-        _LOGGER.debug("Filenames in coverage data are not relative, "
-                      "removing filename prefix: %s" % cov_file_extra_prefix)
-        self.df_cov['filename'] = self.df_cov['filename'].str.replace(
-            cov_file_extra_prefix, "")
+            _LOGGER.warn(
+                "Filename '%s' from the coverage data is not in the "
+                "callgraph database. File paths in coverage data will "
+                "likely not match the file paths in callgraph database."
+                % example_cov_file)
 
     def _is_csv_out(self, filename):
         _fname, extension = os.path.splitext(filename)
@@ -320,7 +306,7 @@ class Grapher():
         if self.edge_labels:
             beg = "<FONT POINT-SIZE=\"8\">"
             end = "</FONT>"
-            label = "<%s%s%s>" % (beg, row.caller_line, end)
+            label = "<%s%s%s>" % (beg, int(row.caller_line), end)
             self.digraph.edge(
                 "%s_%s" % (row.caller_filename, row.caller_function),
                 "%s_%s" % (row.callee_filename, row.callee_function),
