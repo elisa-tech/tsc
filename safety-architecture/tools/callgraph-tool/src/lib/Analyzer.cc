@@ -6,31 +6,15 @@
 // ===-----------------------------------------------------------===//
 
 #include "llvm/Bitcode/BitcodeReader.h"
-#include "llvm/Bitcode/BitcodeWriter.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/PassManager.h"
-#include "llvm/IR/Verifier.h"
 #include "llvm/IRReader/IRReader.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/ManagedStatic.h"
-#include "llvm/Support/Path.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
-#include "llvm/Support/SourceMgr.h"
-#include "llvm/Support/SystemUtils.h"
-#include "llvm/Support/ToolOutputFile.h"
 
-#include <memory>
-#include <sstream>
-#include <sys/resource.h>
-#include <vector>
-
-#include "Analyzer.h"
 #include "CallGraph.h"
-#include "Common.h"
 
 using namespace llvm;
+using namespace std;
 
 // Command line parameters.
 cl::list<string> InputFilenames(cl::Positional, cl::OneOrMore,
