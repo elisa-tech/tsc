@@ -3,6 +3,7 @@ LLVM_DIR := /usr/lib/llvm-10
 CRIXCG_SRC_DIR := ${CURDIR}/src
 CRIXCG_BUILD_DIR := ${CURDIR}/build
 PATH := $(LLVM_DIR)/bin:$(PATH)
+PYENV_DIR := ${CURDIR}/venv
 
 UNAME := $(shell uname)
 ifeq ($(UNAME), Linux)
@@ -56,6 +57,20 @@ llvm-check: ## Check LLVM is available
 
 install-requirements: ## Install python requirements
 	pip3 install -r requirements.txt --no-cache-dir
+	$(call target_success,$@)
+
+install-preprequisites:
+	sudo apt update
+	sudo apt install -y -q python3 \
+		build-essential cmake \
+		clang-10 python3-clang-10 llvm-10 llvm-10-dev clang-format-10
+	@if [ ! -d ${PYENV_DIR} ]; then \
+		printf "${YELLOW}Python env directory does not exist${NC}\n"; \
+		printf "${YELLOW}Creating python env direcotry ${PYENV_DIR}{$NC}\n"; \
+	fi
+	python3 -m venv venv
+	source venv/bin/activate
+	venv/bin/pip3 install -r requirements.txt --no-cache-dir
 	$(call target_success,$@)
 
 pre-push: test style clean ## Run tests, style, and clean
