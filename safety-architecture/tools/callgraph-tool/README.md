@@ -33,12 +33,17 @@ git clone https://github.com/elisa-tech/workgroups.git
 CG_DIR=$(pwd)/workgroups/safety-architecture/tools/callgraph-tool
 ```
 
-Install prerequisites with:
+Install the following requirements:
 ```
-make install-prerequisites
+sudo apt install python3 python3-pip build-essential cmake \
+clang-10 python3-clang-10 llvm-10 llvm-10-dev clang-format-10 graphviz
 ```
 
-This will install required apt and Python packages. Python packages will be installed into local Python environment directory `venv`.
+In addition, the scripts rely on python packages specified in requirements.txt. You can install the required packages with:
+```
+cd $CG_DIR
+pip3 install -r requirements.txt
+```
 
 You also need the target kernel source tree. For the sake of example, we use the mainline tree:
 ```
