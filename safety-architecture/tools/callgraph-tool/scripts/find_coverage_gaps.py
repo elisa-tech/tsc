@@ -17,34 +17,6 @@ _LOGGER = logging.getLogger(utils.LOGGER_NAME)
 
 ################################################################################
 
-
-class CallGraphFilter():
-    def __init__(
-            self,
-            caller_function=None, caller_filename=None,
-            callee_function=None, callee_filename=None):
-        self.caller_function = caller_function
-        self.caller_filename = caller_filename
-        self.callee_function = callee_function
-        self.callee_filename = callee_filename
-
-    def get_query_str(self):
-        return ' & '.join(
-            ["{}=='{}'".format(key, value)
-             for key, value in self.__dict__.items() if value is not None])
-
-    def __eq__(self, other):
-        if isinstance(other, CallGraphFilter):
-            return (
-                self.caller_function == other.caller_function and
-                self.caller_filename == other.caller_filename and
-                self.callee_function == other.callee_function and
-                self.callee_filename == other.callee_filename)
-        return False
-
-
-################################################################################
-
 class CoverageGapFinder():
     def __init__(self, csv_calls, csv_coverage, maxdepth, outfile):
         self.df_calls = df_from_csv_file(csv_calls)
