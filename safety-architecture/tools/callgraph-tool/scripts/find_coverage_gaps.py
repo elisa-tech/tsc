@@ -68,10 +68,10 @@ class CoverageGapFinder():
             return 0
 
         # Find the caller coverage
-        caller_cov = self._get_coverage(caller.caller_function)
+        caller_cov = self._get_coverage(caller.caller_function, caller.caller_filename)
 
         # Find the callee coverage
-        callee_cov = self._get_coverage(caller.callee_function)
+        callee_cov = self._get_coverage(caller.callee_function, caller.callee_filename)
 
         # Update depth and call_stack
         depth += 1
@@ -97,24 +97,25 @@ class CoverageGapFinder():
         # (including duplicate pairs of caller-callee)
         return callees
 
-    def _get_coverage(self, funcname):
+    def _get_coverage(self, funcname, filename):
         if not funcname or pd.isna(funcname):
             _LOGGER.warn(
                 "Invalid function name: %s" % funcname)
             return 0
         df_cov = self.df_cov[(
-            self.df_cov['function'] == funcname)]
+            self.df_cov['function'] == funcname) & (
+            self.df_cov['filename'] == filename)]
         if df_cov.shape[0] <= 0:
             _LOGGER.warn(
-                "Missing coverage info for function: %s" % funcname)
+                "Missing coverage info for function: %s:%s" % (filename, funcname))
             return 0
         elif df_cov.shape[0] > 1:
             _LOGGER.warn(
-                "Multiple coverage values for function: %s" % funcname)
+                "Multiple coverage values for function: %s:%s" % (filename, funcname))
         df_head = df_cov.head(1)
         if df_head is None:
             _LOGGER.warn(
-                "Dataframe head(1) returned None for function: %s" % funcname)
+                "Dataframe head(1) returned None for function: %s:%s" % (filename, funcname))
             return 0
         return cov_to_number(df_head['percent'].iloc[0])
 
