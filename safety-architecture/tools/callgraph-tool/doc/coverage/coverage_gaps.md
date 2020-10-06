@@ -12,7 +12,7 @@ Coverage gaps are callgraph subtrees where the potential for code coverage impro
 ## Getting Started
 You need a callgraph database in csv format. Follow the instructions from [README.md](../../README.md) to generate the callgraph for your target system.
 
-You also need the code coverage information. The expected format is a CSV file, with at least the following headers: `Filename,Function,Percent`. See [todo](link_here.md) for an example of how to generate such coverage information from a syzkaller test run.
+You also need the code coverage information. The expected format is a CSV file, with at least the following headers: `Filename,Function,Percent`. Look up the [document](syzkaller_coverage.md) for an example of how to generate such coverage information from a syzkaller test run.
 
 ## Finding Coverage Gaps
 For the sake of example, let's assume we have the following callgraph and the coverage information as shown in the graph (the multiple paths in the image are collated using `merge_edges` for better visibility):

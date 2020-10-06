@@ -17,6 +17,7 @@ _LOGGER = logging.getLogger(utils.LOGGER_NAME)
 
 ################################################################################
 
+
 class CoverageGapFinder():
     def __init__(self, csv_calls, csv_coverage, maxdepth, outfile):
         self.df_calls = df_from_csv_file(csv_calls)
