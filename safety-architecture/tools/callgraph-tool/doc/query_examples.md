@@ -18,7 +18,7 @@ Table of Contents
     * [Example: visualizing coverage data](#example-visualizing-coverage-data)
 
 ## Setup
-To begin, make sure you have gone through the following the setup instructions from the main [README](../README.md):
+To begin, make sure you have gone through the following setup instructions from the main [README](../README.md):
 - [Getting started](../README.md#getting-started)
 - [Build the crix-callgraph tool](../README.md#build-the-crix-callgraph-tool)
 

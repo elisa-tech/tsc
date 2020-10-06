@@ -9,7 +9,7 @@ This repository is a collection of tools for constructing and analyzing callgrap
 - Scales well to large programs, does not require excessive resources. Finds direct and indirect function calls from an example Linux x86_64_defconfig kernel build in less than two minutes on a laptop with 8GB RAM and a SSD drive.
 - Allows effectively querying and viewing function call chains from large C programs.
 
-See some example uses at: [How to use the callgraph database](./doc/query_examples.md#how-to-use-the-callgraph-database).
+See some example uses at: [How to use the callgraph database](./doc/query_examples.md#how-to-use-the-callgraph-database). To get started on using callgraph with your own target C programs, check this [example](./doc/simple_c_example.md).
 
 Table of Contents
 =================
