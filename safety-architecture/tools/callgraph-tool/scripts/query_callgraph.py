@@ -104,10 +104,14 @@ class Grapher():
 
         if self.inverse:
             # Filter by callee_function if 'inverse' requested
-            filter = CallGraphFilter(callee_function=args.function)
+            filter = CallGraphFilter(
+                callee_function=args.function,
+                callee_filename=args.filename)
         else:
             # Otherwise filter by caller_function
-            filter = CallGraphFilter(caller_function=args.function)
+            filter = CallGraphFilter(
+                caller_function=args.function,
+                caller_filename=args.filename)
 
         # Initial number of entries in the graph
         initlen = len(self.digraph.body)
@@ -447,6 +451,9 @@ def getargs():
     help = "filter by function name (exact match)"
     required_named.add_argument(
         '--function', help=help, required=True)
+
+    help = "filter by filename (exact match)"
+    parser.add_argument('--filename', help=help, default=None)
 
     help = "set the graph depth, defaults to 2"
     parser.add_argument(
