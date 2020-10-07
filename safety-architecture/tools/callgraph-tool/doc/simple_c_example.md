@@ -107,8 +107,8 @@ To visualize the functions called by function `main` run the following command:
 # --colorize 'gets': colorize graph node if function name matches the given regular expression
 # --out test_demo.png: output png-image with filename 'test_demo.png'
 
-cd $CG_DIR
-./scripts/query_callgraph.py --csv callgraph_test_demo.csv --function main --depth 3 \
+cd $CG_DIR/tests/resources/query-callgraph; \
+$CG_DIR/scripts/query_callgraph.py --csv callgraph_test_demo.csv --function main --depth 3 \
 --edge_labels --colorize 'gets' --out test_demo.png
 ```
 Output:
