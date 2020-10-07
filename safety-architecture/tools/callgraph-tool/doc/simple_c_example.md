@@ -76,12 +76,11 @@ int main()
 ## Compiling target program to bitcode
 ```
 # We assume $CG_DIR variable contains the path to callgraph directory
-cd $CG_DIR/tests/resources/query-callgraph
-
 # Add correct version of clang to PATH
 source $CG_DIR/env.sh
 
-# Compile test-demo.c to bitcode, including debugging info
+# Compile test-demo.c to bitcode, including debug info
+cd $CG_DIR/tests/resources/query-callgraph; \
 clang -O0 -g -emit-llvm -c -o test-demo.bc test-demo.c
 ```
 
@@ -90,9 +89,9 @@ clang -O0 -g -emit-llvm -c -o test-demo.bc test-demo.c
 # Compile crix-callgraph if it wasn't compiled yet
 cd $CG_DIR && make
 
-# Generate callgraph based on the test-demo.bc we just compiled
-cd $CG_DIR/tests/resources/query-callgraph
-./$CG_DIR/build/lib/crix-callgraph test-demo.bc -o callgraph_test_demo.csv
+# Generate callgraph based on the test-demo.bc
+cd $CG_DIR/tests/resources/query-callgraph; \
+$CG_DIR/build/lib/crix-callgraph test-demo.bc -o callgraph_test_demo.csv
 
 # Now, you can find the callgraph database in `callgraph_test_demo.csv`
 ```
@@ -108,7 +107,7 @@ To visualize the functions called by function `main` run the following command:
 # --colorize 'gets': colorize graph node if function name matches the given regular expression
 # --out test_demo.png: output png-image with filename 'test_demo.png'
 
-cd $CG_DIR/tests/resources/query-callgraph
+cd $CG_DIR
 ./scripts/query_callgraph.py --csv callgraph_test_demo.csv --function main --depth 3 \
 --edge_labels --colorize 'gets' --out test_demo.png
 ```

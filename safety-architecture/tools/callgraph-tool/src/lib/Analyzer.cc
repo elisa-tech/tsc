@@ -124,6 +124,8 @@ int main(int argc, char **argv) {
 
   );
 
+  const string yellow("\033[1;33m");
+  const string reset("\033[0m");
   GlobalCtx.analysisType = optAnalysisType;
   GlobalCtx.csvout.open(optOutFilename);
   SMDiagnostic Err;
@@ -137,11 +139,12 @@ int main(int argc, char **argv) {
     unique_ptr<Module> M = parseIRFile(InputFilenames[i], Err, *LLVMCtx);
 
     if (M == NULL) {
-      OP << argv[0] << ": error loading file '" << InputFilenames[i] << "'\n";
+      OP << yellow << "[Warning]" << reset << " error loading file '"
+         << InputFilenames[i] << "'\n";
       continue;
     } else if (M->getNamedMetadata("llvm.dbg.cu") == NULL) {
-      OP << argv[0] << ": warning: debug info missing: " << M->getName()
-         << "\n";
+      OP << yellow << "[Warning]" << reset
+         << " debug info missing: " << M->getName() << "\n";
     }
 
     Module *Module = M.release();

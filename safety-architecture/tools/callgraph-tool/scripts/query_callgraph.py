@@ -306,7 +306,7 @@ class Grapher():
         if self.edge_labels:
             beg = "<FONT POINT-SIZE=\"8\">"
             end = "</FONT>"
-            label = "<%s%s%s>" % (beg, int(row.caller_line), end)
+            label = "<%s%s%s>" % (beg, str(row.caller_line).split('.')[0], end)
             self.digraph.edge(
                 "%s_%s" % (row.caller_filename, row.caller_function),
                 "%s_%s" % (row.callee_filename, row.callee_function),
