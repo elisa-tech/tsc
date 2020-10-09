@@ -19,8 +19,7 @@ PROGS = \
   test-bitfield\
   test-escape\
   test-sizeof\
-
-#PROGS = direct
+  test-ta-mlta\
 
 define target_success
 	@printf "\033[32m==> Target \"$(1)\" passed\033[0m\n\n"

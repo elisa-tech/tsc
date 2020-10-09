@@ -68,3 +68,5 @@
 "test-sizeof.c","main","9","16","test-sizeof.c","func","4","direct","","",""
 "test-sizeof.c","main","9","17","","printf","","direct","","",""
 "test-sizeof.c","func","4","5","","printf","","direct","","",""
+"test-ta-mlta.c","say_hello","3","5","","printf","","direct","","",""
+"test-ta-mlta.c","main","12","16","test-ta-mlta.c","say_hello","3","indirect","","","MLTA"

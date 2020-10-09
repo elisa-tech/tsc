@@ -165,6 +165,21 @@ void CallGraphPass::findCalleesWithType(CallInst *CI, FuncSet &S) {
       continue;
     }
 
+    // Skip if the function return types don't match
+    Type *CSTy = CS->getType();
+    Type *FRetTy = F->getReturnType();
+    if (CSTy && FRetTy) {
+      // LOG_OBJ("CallSite Type: ", CSTy);
+      // LOG_OBJ("Function Return Type: ", FRetTy);
+      // From Type.h:
+      // The instances of the Type class are immutable: once they are created,
+      // they are never changed.  Also note that only one instance of a
+      // particular type is ever created.  Thus seeing if two types are equal is
+      // a matter of doing a trivial pointer comparison.
+      if (CSTy != FRetTy)
+        continue;
+    }
+
     // Type matching on args.
     bool Matched = true;
     CallSite::arg_iterator AI = CS.arg_begin();
@@ -279,6 +294,7 @@ bool CallGraphPass::typeConfineInInitializer(User *Ini) {
 
 bool CallGraphPass::typeConfineInStore(StoreInst *SI) {
 
+  LOG_OBJ("StoreInst: ", SI);
   Value *PO = SI->getPointerOperand();
   Value *VO = SI->getValueOperand();
 
@@ -343,6 +359,8 @@ bool CallGraphPass::typeConfineInStore(StoreInst *SI) {
 
 bool CallGraphPass::typeConfineInCast(CastInst *CastI) {
 
+  LOG_OBJ("CastInst: ", CastI);
+
   // If a function address is ever cast to another type and stored
   // to a composite type, the escaping analysis will capture the
   // composite type and discard it
@@ -399,6 +417,7 @@ void CallGraphPass::funcSetIntersection(FuncSet &FS1, FuncSet &FS2,
 Value *CallGraphPass::nextLayerBaseType(Value *V, Type *&BTy, int &Idx,
                                         const DataLayout *DL) {
 
+  LOG_OBJ("Value: ", V);
   if (BitCastOperator *BOP = dyn_cast<BitCastOperator>(V)) {
     if (Value *op = BOP->getOperand(0)) {
       Type *oType = op->getType();
@@ -451,7 +470,13 @@ bool CallGraphPass::findCalleesWithMLTA(CallInst *CI, FuncSet &FS) {
   FuncSet FS1 = Ctx->sigFuncsMap[callHash(CI)];
   if (FS1.size() == 0) {
     // No need to go through MLTA if the first layer is empty
+    LOG("Not in sigFuncsMap: MLTA failed");
     return false;
+  }
+
+  if (DEBUG) {
+    for (Function *Callee : FS1)
+      LOG_FMT("First-layer match: %s\n", Callee->getName().str().c_str());
   }
 
   FuncSet FS2, FST;
@@ -510,6 +535,11 @@ bool CallGraphPass::findCalleesWithMLTA(CallInst *CI, FuncSet &FS) {
     // Step 4: go to a lower layer
     CV = nextLayerBaseType(CV, LayerTy, FieldIdx, DL);
     FS1 = FST;
+
+    if (DEBUG) {
+      for (Function *Callee : FS1)
+        LOG_FMT("Match: %s\n", Callee->getName().str().c_str());
+    }
   }
 
   FS = FS1;
@@ -537,6 +567,7 @@ bool CallGraphPass::doInitialization(Module *M) {
     if (!isa<ConstantAggregate>(Ini))
       continue;
 
+    LOG_OBJ("Global variable init: ", Ini);
     typeConfineInInitializer(Ini);
   }
 
@@ -547,6 +578,8 @@ bool CallGraphPass::doInitialization(Module *M) {
     //	continue;
     if (F.isDeclaration())
       continue;
+
+    LOG_FMT("Function: %s\n", F.getName().str().c_str());
 
     for (inst_iterator i = inst_begin(F), e = inst_end(F); i != e; ++i) {
       Instruction *I = &*i;
@@ -560,7 +593,10 @@ bool CallGraphPass::doInitialization(Module *M) {
 
     // Collect address-taken functions.
     if (F.hasAddressTaken()) {
+      LOG("hasAddressTaken");
+      LOG_FMT("adding to AddressTakenFuncs: %s\n", F.getName().str().c_str());
       Ctx->AddressTakenFuncs.insert(&F);
+      LOG_FMT("adding to sigFuncsMap: %s\n", F.getName().str().c_str());
       Ctx->sigFuncsMap[funcHash(&F, false)].insert(&F);
     }
 
@@ -572,12 +608,14 @@ bool CallGraphPass::doInitialization(Module *M) {
       Ctx->GlobalFuncs[FName] = &F;
     }
 
+    LOG("checking UnifiedFuncMap");
     // Keep a single copy for same functions (inline functions)
     size_t fh = funcHash(&F);
     if (Ctx->UnifiedFuncMap.find(fh) == Ctx->UnifiedFuncMap.end()) {
       Ctx->UnifiedFuncMap[fh] = &F;
 
       if (F.hasAddressTaken()) {
+        LOG_FMT("adding to sigFuncsMap: %s\n", F.getName().str().c_str());
         Ctx->sigFuncsMap[funcHash(&F, false)].insert(&F);
       }
     }
@@ -599,6 +637,21 @@ bool CallGraphPass::doInitialization(Module *M) {
       LOG(("[Key:" + to_string(pair.first) +
            "]: " + pair.second->getName().str())
               .c_str());
+    }
+    os.str("");
+    os.clear();
+    LOG("sigFuncsMap:");
+    for (auto const &pair : Ctx->sigFuncsMap) {
+      os << "[Key:" << to_string(pair.first) << "]: ";
+      for (Function *f : pair.second) {
+        os << f->getName().str() << " ";
+      }
+      os << "\n";
+    }
+    LOG(os.str().c_str());
+    LOG("AddressTakenFuncs:");
+    for (Function *f : Ctx->AddressTakenFuncs) {
+      LOG_FMT("[%s]\n", f->getName().str().c_str());
     }
   }
 

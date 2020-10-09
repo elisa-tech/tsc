@@ -134,4 +134,8 @@ def test_same_funcname(set_up_test_data):
     check_function_calls_from("test-same-funcname.bclist")
 
 
+def test_ta_mlta(set_up_test_data):
+    check_function_calls_from("test-ta-mlta.bclist")
+
+
 ################################################################################
