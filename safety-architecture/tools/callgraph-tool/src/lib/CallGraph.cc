@@ -6,8 +6,6 @@
 // First layer: matching function type
 // Second layer: matching struct type
 //
-// In addition, loops are unrolled as "if" statements
-//
 //===-----------------------------------------------------------===//
 
 #include "llvm/IR/IRBuilder.h"
@@ -20,6 +18,7 @@ using namespace llvm;
 using namespace std;
 
 DenseMap<size_t, FuncSet> CallGraphPass::typeFuncsMap;
+unordered_map<size_t, set<size_t>> CallGraphPass::typeConfineMap;
 unordered_map<size_t, set<size_t>> CallGraphPass::typeTransitMap;
 set<size_t> CallGraphPass::typeEscapeSet;
 
@@ -251,18 +250,26 @@ bool CallGraphPass::typeConfineInInitializer(User *Ini) {
     User *U = LU.front();
     LU.pop_front();
 
+    LOG_OBJ("Initializer: ", U);
+
     for (auto oi = U->op_begin(), oe = U->op_end(); oi != oe; ++oi) {
       Value *O = *oi;
       Type *OTy = O->getType();
+
       // Case 1: function address is assigned to a type
       if (Function *F = dyn_cast<Function>(O)) {
         Type *ITy = U->getType();
         // TODO: use offset?
         unsigned ONo = oi->getOperandNo();
+        LOG_FMT("Adding to typeFuncsMap: Function [%s] assigned to field idx "
+                "[%u]\n",
+                F->getName().str().c_str(), ONo);
         typeFuncsMap[typeIdxHash(ITy, ONo)].insert(F);
         for (auto const &h : typeHashes) {
-          size_t idxH = hashIdxHash(h, ONo);
-          typeFuncsMap[idxH].insert(F);
+          LOG_FMT("Adding to typeFuncsMap from typeHashes: Function [%s] "
+                  "assigned to field with hash [%lu]\n",
+                  F->getName().str().c_str(), h);
+          typeFuncsMap[h].insert(F);
         }
       }
       // Case 2: a composite-type object (value) is assigned to a
@@ -270,7 +277,15 @@ bool CallGraphPass::typeConfineInInitializer(User *Ini) {
       else if (isCompositeType(OTy)) {
         // confine composite types
         Type *ITy = U->getType();
-        typeHashes.insert(typeHash(ITy));
+        unsigned ONo = oi->getOperandNo();
+        size_t h = typeIdxHash(ITy, ONo);
+        LOG_FMT("Adding to typeConfineMap: Type assigned to field idx [%u]\n",
+                ONo);
+        LOG_OBJ("assigned to type: ", ITy);
+        LOG_OBJ("assigned type: ", OTy);
+        typeConfineMap[h].insert(typeHash(OTy));
+        LOG_FMT("Adding to typeHashes: %lu\n", h);
+        typeHashes.insert(h);
 
         // recognize nested composite types
         User *OU = dyn_cast<User>(O);
@@ -292,64 +307,72 @@ bool CallGraphPass::typeConfineInInitializer(User *Ini) {
   return true;
 }
 
-bool CallGraphPass::typeConfineInStore(StoreInst *SI) {
+bool CallGraphPass::typeConfineInStore(Value *Dst, Value *Src) {
 
-  LOG_OBJ("StoreInst: ", SI);
-  Value *PO = SI->getPointerOperand();
-  Value *VO = SI->getValueOperand();
+  LOG_OBJ("Destination: ", Dst);
+  LOG_FMT("Source: %s\n", Src->getName().str().c_str());
+  IndexVector NextLayer;
+  int FieldIdx = -1;
 
   // Case 1: The value operand is a function
-  if (Function *F = dyn_cast<Function>(VO)) {
-    Type *STy;
-    int Idx;
-    if (nextLayerBaseType(PO, STy, Idx, DL)) {
-      typeFuncsMap[typeIdxHash(STy, Idx)].insert(F);
-      return true;
-    } else {
-      // TODO: OK, for now, let's only consider composite type;
-      // skip for other cases
-      return false;
+  if (Function *F = dyn_cast<Function>(Src)) {
+    while (Type *STy = nextLayerBaseType(Dst, FieldIdx, &NextLayer)) {
+      LOG_OBJ("Next layer type: ", STy);
+      LOG_FMT("Adding to typeFuncsMap: Function [%s] assigned to field idx "
+              "[%u]\n",
+              F->getName().str().c_str(), FieldIdx);
+      typeFuncsMap[typeIdxHash(STy, FieldIdx)].insert(F);
+      if (NextLayer.empty()) {
+        break;
+      }
     }
+    return true;
   }
 
   // Case 2: value-based store
   // A composite-type object is stored
-  Type *EPTy = dyn_cast<PointerType>(PO->getType())->getElementType();
-  Type *VTy = VO->getType();
+  Type *EPTy = dyn_cast<PointerType>(Dst->getType())->getElementType();
+  Type *VTy = Src->getType();
   if (isCompositeType(VTy)) {
     if (isCompositeType(EPTy)) {
+      LOG_FMT("Adding to typeConfineMap: Type [%s] assigned to type [%s]\n",
+              VTy->getStructName().str().c_str(),
+              EPTy->getStructName().str().c_str());
+      typeConfineMap[typeHash(EPTy)].insert(typeHash(VTy));
       return true;
     } else {
-      LOG_OBJ("StoreInst (Case2): ", SI);
       escapeType(EPTy);
       return false;
     }
   }
 
   // Case 3: reference (i.e., pointer)-based store
-  if (isa<ConstantPointerNull>(VO))
+  if (isa<ConstantPointerNull>(Src))
     return false;
   // FIXME: Get the correct types
-  PointerType *PVTy = dyn_cast<PointerType>(VO->getType());
+  PointerType *PVTy = dyn_cast<PointerType>(Src->getType());
   if (!PVTy)
     return false;
 
   Type *EVTy = PVTy->getElementType();
 
   // Store something to a field of a composite-type object
-  Type *STy;
-  int Idx;
-  if (nextLayerBaseType(PO, STy, Idx, DL)) {
+  if (Type *STy = nextLayerBaseType(Dst, FieldIdx)) {
+    LOG_OBJ("Next layer type: ", STy);
     // The value operand is a pointer to a composite-type object
     if (isCompositeType(EVTy)) {
+      LOG_FMT("Adding to typeConfineMap: Type assigned to field idx [%u]\n",
+              FieldIdx);
+      LOG_OBJ("assigned to type: ", STy);
+      LOG_OBJ("assigned type: ", EVTy);
+      typeConfineMap[typeIdxHash(STy, FieldIdx)].insert(typeHash(EVTy));
       return true;
     } else {
       // TODO: The type is escaping?
       // Example: mm/mempool.c +188: pool->free = free_fn;
       // free_fn is a function pointer from an function
       // argument
-      LOG_OBJ("StoreInst (Case3): ", SI);
-      escapeType(STy, Idx);
+      escapeType(STy, FieldIdx);
       return false;
     }
   }
@@ -414,52 +437,91 @@ void CallGraphPass::funcSetIntersection(FuncSet &FS1, FuncSet &FS2,
 
 // Get the composite type of the lower layer. Layers are split by
 // memory loads
-Value *CallGraphPass::nextLayerBaseType(Value *V, Type *&BTy, int &Idx,
-                                        const DataLayout *DL) {
-
+Type *CallGraphPass::nextLayerBaseType(Value *V, int &Idx,
+                                       IndexVector *Indices) {
   LOG_OBJ("Value: ", V);
-  if (BitCastOperator *BOP = dyn_cast<BitCastOperator>(V)) {
-    if (Value *op = BOP->getOperand(0)) {
-      Type *oType = op->getType();
-      if (oType->isPointerTy()) {
-        Type *eTy = dyn_cast<PointerType>(oType)->getElementType();
-        BTy = eTy;
-        return op;
+
+  // Case 1: GEPOperator
+  if (GEPOperator *GEP = dyn_cast<GEPOperator>(V)) {
+    LOG_OBJ("GEPOperator: ", GEP);
+
+    if (GEP->getNumIndices() < 2) {
+      LOG("Expecting at least two indices");
+      return NULL;
+    }
+    if (!GEP->hasAllConstantIndices()) {
+      LOG("Not all constant indices");
+      return NULL;
+    }
+    IndexVector IntermediateIndices;
+    if (!Indices) {
+      LOG("Indices is NULL");
+      Indices = &IntermediateIndices;
+    }
+    if (Indices->empty()) {
+      LOG("Indices is empty");
+      Indices->push_back(GEP->getOperand(1));
+      for (unsigned i = 1, e = GEP->getNumIndices() - 1; i != e; ++i) {
+        Indices->push_back(GEP->getOperand(i + 1));
       }
     }
-  }
+    Type *Ty = GetElementPtrInst::getIndexedType(GEP->getSourceElementType(),
+                                                 *Indices);
+    // Check if bitcast impacts the type
+    // TODO: use offsets instead of indexes to handle these cases proprely
+    Type *TyBeforeBitcast = GEP->getPointerOperand()
+                                ->stripPointerCasts()
+                                ->getType()
+                                ->getPointerElementType();
+    Type *TyAfterBitcast =
+        GEP->getPointerOperand()->getType()->getPointerElementType();
+    if (TyBeforeBitcast != TyAfterBitcast && TyAfterBitcast == Ty) {
+      LOG("Bitcast impacts types:");
+      LOG_OBJ("Type before bitcast: ", TyBeforeBitcast);
+      LOG_OBJ("Type after bitcast: ", TyAfterBitcast);
+      int NumElemsBeforeBitcast = 0;
+      int NumElemsAfterBitcast = 0;
+      if (TyBeforeBitcast->isStructTy() && TyAfterBitcast->isStructTy()) {
+        LOG("Both are struct types");
+        NumElemsBeforeBitcast = TyBeforeBitcast->getStructNumElements();
+        NumElemsAfterBitcast = TyAfterBitcast->getStructNumElements();
+      } else {
+        LOG("Not struct types");
+        LOG_FMT("Type before: %i\n", TyBeforeBitcast->getTypeID());
+        LOG_FMT("Type after: %i\n", TyAfterBitcast->getTypeID());
+      }
+      if (NumElemsBeforeBitcast != NumElemsAfterBitcast) {
+        LOG("Bitcast impacts number of fields");
+        return NULL;
+      }
+      Ty = TyBeforeBitcast;
+    }
 
-  // Two ways to get the next layer type: GetElementPtrInst and
-  // LoadInst
-  // Case 1: GetElementPtrInst
-  // Use GEPOperator instead of GetElementPtrInst, see:
-  // https://lists.llvm.org/pipermail/llvm-dev/2019-March/130869.html
-  if (GEPOperator *GEP = dyn_cast<GEPOperator>(V)) {
-    Type *PTy = GEP->getPointerOperand()->getType();
-    Type *Ty = PTy->getPointerElementType();
-    if ((Ty->isStructTy() || Ty->isArrayTy() || Ty->isVectorTy()) &&
-        GEP->hasAllConstantIndices()) {
-      BTy = Ty;
-      User::op_iterator ie = GEP->idx_end();
-      ConstantInt *ConstI = dyn_cast<ConstantInt>((--ie)->get());
-      Idx = ConstI->getSExtValue();
-      return GEP->getPointerOperand();
-    } else
+    LOG_OBJ("Final Type: ", Ty);
+    if (!(Ty->isStructTy() || Ty->isArrayTy() || Ty->isVectorTy())) {
+      LOG("Unsupported type");
       return NULL;
+    }
+    Value *idx = GEP->getOperand(Indices->size() + 1);
+    Idx = dyn_cast<ConstantInt>(idx)->getSExtValue();
+    LOG_FMT("Final index: %i\n", Idx);
+    Indices->pop_back();
+    return Ty;
   }
   // Case 2: LoadInst
   else if (LoadInst *LI = dyn_cast<LoadInst>(V)) {
-    return nextLayerBaseType(LI->getOperand(0), BTy, Idx, DL);
+    LOG("LoadInst");
+    return nextLayerBaseType(LI->getOperand(0), Idx, Indices);
   }
   // Other instructions such as CastInst
   // FIXME: may introduce false positives
-#if 1
   else if (UnaryInstruction *UI = dyn_cast<UnaryInstruction>(V)) {
-    return nextLayerBaseType(UI->getOperand(0), BTy, Idx, DL);
-  }
-#endif
-  else
+    LOG("UnaryInstruction");
+    return nextLayerBaseType(UI->getOperand(0), Idx, Indices);
+  } else {
+    LOG("Unexpected type");
     return NULL;
+  }
 }
 
 bool CallGraphPass::findCalleesWithMLTA(CallInst *CI, FuncSet &FS) {
@@ -481,46 +543,49 @@ bool CallGraphPass::findCalleesWithMLTA(CallInst *CI, FuncSet &FS) {
 
   FuncSet FS2, FST;
 
-  Type *LayerTy = NULL;
   int FieldIdx = -1;
   Value *CV = CI->getCalledValue();
-
-  // Get the second-layer type
-#ifndef ONE_LAYER_MLTA
-  CV = nextLayerBaseType(CV, LayerTy, FieldIdx, DL);
-#else
-  CV = NULL;
-#endif
-
+  IndexVector NextLayer;
   int LayerNo = 1;
-  while (CV) {
-    // Step 1: ensure the type hasn't escaped
-#if 1
-    if ((typeEscapeSet.find(typeHash(LayerTy)) != typeEscapeSet.end()) ||
-        (typeEscapeSet.find(typeIdxHash(LayerTy, FieldIdx)) !=
-         typeEscapeSet.end())) {
+  int FirstIdx = -1;
 
+  while (Type *LayerTy = nextLayerBaseType(CV, FieldIdx, &NextLayer)) {
+    LOG_OBJ("Next layer LayerTy: ", LayerTy);
+    LOG_FMT("Next layer FieldIdx: %d\n", FieldIdx);
+
+    size_t TypeHash = typeHash(LayerTy);
+    size_t TypeIdxHash = typeIdxHash(LayerTy, FieldIdx);
+
+    // Step 1: ensure the type hasn't escaped
+    if ((typeEscapeSet.find(TypeHash) != typeEscapeSet.end()) ||
+        (typeEscapeSet.find(TypeIdxHash) != typeEscapeSet.end())) {
+      LOG("Stopping, type escapes");
       break;
     }
-#endif
+
+    if (FirstIdx == -1)
+      FirstIdx = FieldIdx;
 
     // Step 2: get the funcset and merge
-    ++LayerNo;
-    FS2 = typeFuncsMap[typeIdxHash(LayerTy, FieldIdx)];
-
-    if (FS2.empty()) {
-      FS2 = FS1;
+    FS2 = typeFuncsMap[TypeIdxHash];
+    auto TC = typeConfineMap[TypeIdxHash];
+    for (size_t hash : TC) {
+      LOG_FMT("TypeConfineMap hash: %lu\n", hash);
+      FuncSet FS3 = typeFuncsMap[hashIdxHash(hash, FirstIdx)];
+      FST.clear();
+      funcSetIntersection(FS1, FS3, FST);
+      if (!FST.empty())
+        FS1 = FST;
     }
+
     funcSetIntersection(FS1, FS2, FST);
 
     // Step 3: get transitted funcsets and merge
-    // NOTE: this nested loop can be slow
 #if 1
-    unsigned TH = typeHash(LayerTy);
-    list<unsigned> LT;
-    LT.push_back(TH);
+    list<size_t> LT;
+    LT.push_back(TypeHash);
     while (!LT.empty()) {
-      unsigned CT = LT.front();
+      size_t CT = LT.front();
       LT.pop_front();
 
       for (auto H : typeTransitMap[CT]) {
@@ -531,19 +596,20 @@ bool CallGraphPass::findCalleesWithMLTA(CallInst *CI, FuncSet &FS) {
       }
     }
 #endif
-
-    // Step 4: go to a lower layer
-    CV = nextLayerBaseType(CV, LayerTy, FieldIdx, DL);
     FS1 = FST;
-
     if (DEBUG) {
       for (Function *Callee : FS1)
         LOG_FMT("Match: %s\n", Callee->getName().str().c_str());
     }
+
+    if (NextLayer.empty()) {
+      LOG("Stopping, NextLayer is empty");
+      break;
+    }
+    ++LayerNo;
   }
 
   FS = FS1;
-
   return true;
 }
 
@@ -574,8 +640,6 @@ bool CallGraphPass::doInitialization(Module *M) {
   // Iterate functions and instructions
   for (Function &F : *M) {
 
-    // if (F.empty())
-    //	continue;
     if (F.isDeclaration())
       continue;
 
@@ -585,7 +649,7 @@ bool CallGraphPass::doInitialization(Module *M) {
       Instruction *I = &*i;
 
       if (StoreInst *SI = dyn_cast<StoreInst>(I)) {
-        typeConfineInStore(SI);
+        typeConfineInStore(SI->getPointerOperand(), SI->getValueOperand());
       } else if (CastInst *CastI = dyn_cast<CastInst>(I)) {
         typeConfineInCast(CastI);
       }
@@ -632,6 +696,17 @@ bool CallGraphPass::doInitialization(Module *M) {
       os << "\n";
     }
     LOG(os.str().c_str());
+    os.str("");
+    os.clear();
+    LOG("typeConfineMap:");
+    for (auto const &pair : typeConfineMap) {
+      os << "[Key:" << to_string(pair.first) << "]: ";
+      for (size_t second : pair.second) {
+        os << to_string(second) << " ";
+      }
+      os << "\n";
+    }
+    LOG(os.str().c_str());
     LOG("UnifiedFuncMap:");
     for (auto const &pair : Ctx->UnifiedFuncMap) {
       LOG(("[Key:" + to_string(pair.first) +
@@ -652,6 +727,10 @@ bool CallGraphPass::doInitialization(Module *M) {
     LOG("AddressTakenFuncs:");
     for (Function *f : Ctx->AddressTakenFuncs) {
       LOG_FMT("[%s]\n", f->getName().str().c_str());
+    }
+    LOG("typeEscapeSet:");
+    for (size_t hash : typeEscapeSet) {
+      LOG_FMT("[Key:%lu]\n", hash);
     }
   }
 
@@ -684,7 +763,24 @@ bool CallGraphPass::doModulePass(Module *M) {
       if (CallInst *CI = dyn_cast<CallInst>(&*i)) {
         LOG_OBJ("CallInst: ", CI);
         if (IntrinsicInst *II = dyn_cast<IntrinsicInst>(CI)) {
-          LOG("Skipping llvm internal function");
+          LOG("LLVM internal instruction");
+          Value *Dst = NULL;
+          if (MemCpyInst *M = dyn_cast<MemCpyInst>(II)) {
+            LOG_OBJ("MemCpyInst ", M);
+            Dst = M->getDest();
+          } else if (MemMoveInst *M = dyn_cast<MemMoveInst>(II)) {
+            LOG_OBJ("MemMoveInst", M);
+            Dst = M->getDest();
+          }
+          if (Dst) {
+            int Idx;
+            Type *BTy = nextLayerBaseType(Dst, Idx);
+            if (BTy) {
+              LOG_OBJ("Escaping type: ", BTy);
+              escapeType(BTy, Idx);
+            }
+          }
+          LOG("Skipping LLVM internal function");
           continue;
         }
 
@@ -739,12 +835,7 @@ bool CallGraphPass::doModulePass(Module *M) {
           }
           // InlineAsm
           else {
-            // Many of these are not actually function calls. For instance, all
-            // inline assembly sections will be reported here.
-            // printCallGraphRow(CI, NULL, "unknown", "");
-            // llvm::errs() << "Warning: Possible function calls in "
-            // 	<< "inline assembly are not detected: \n";
-            // CV->print(llvm::errs());
+            // LOG_OBJ("Inline assembly is not supported: ", CI);
           }
         }
       }

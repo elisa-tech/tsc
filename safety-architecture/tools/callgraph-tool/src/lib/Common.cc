@@ -85,6 +85,7 @@ size_t typeHash(Type *Ty) {
 size_t hashIdxHash(size_t Hs, int Idx) {
   hash<string> str_hash;
   LOG_FMT("hash Idx: %d\n", Idx);
+  LOG_FMT("hash idx hash: %lu\n", (Hs + str_hash(to_string(Idx))));
   return Hs + str_hash(to_string(Idx));
 }
 

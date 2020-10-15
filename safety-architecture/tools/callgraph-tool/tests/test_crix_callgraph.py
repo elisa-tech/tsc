@@ -94,8 +94,24 @@ def test_cg_test_template(set_up_test_data):
     check_function_calls_from("cg-test-template.bclist")
 
 
-def test_mlta(set_up_test_data):
-    check_function_calls_from("test-mlta.bclist")
+def test_mlta_basic(set_up_test_data):
+    check_function_calls_from("test-mlta-basic.bclist")
+
+
+def test_mlta_arr(set_up_test_data):
+    check_function_calls_from("test-mlta-arr.bclist")
+
+
+def test_mlta_notassigned(set_up_test_data):
+    check_function_calls_from("test-mlta-notassigned.bclist")
+
+
+def test_mlta_assign_value(set_up_test_data):
+    check_function_calls_from("test-mlta-assign-value.bclist")
+
+
+def test_mlta_misc(set_up_test_data):
+    check_function_calls_from("test-mlta-misc.bclist")
 
 
 def test_opt(set_up_test_data):

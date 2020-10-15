@@ -7,8 +7,8 @@
 typedef void (*fptr_t)(char *, char *);
 
 struct A { fptr_t handler; };
-struct B { struct A a; }; // B is an outer layer of A
-struct C { struct A a; }; // C is an outer layer of A
+struct B { int i; struct A a; }; // B is an outer layer of A
+struct C { char i; int j; struct A a; }; // C is an outer layer of A
 
 #define MAX_LEN 10
 

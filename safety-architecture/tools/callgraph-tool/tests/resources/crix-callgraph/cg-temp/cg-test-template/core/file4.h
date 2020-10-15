@@ -8,7 +8,7 @@ struct bitfield_ops {
     char bits6_9 : 4;
     void (*up)(int bit_nr, void* ops);
     void (*down)(int bit_nr, void* ops);
-    short mask : 10;
+    short mask : 8;
 };
 
 #endif

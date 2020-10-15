@@ -3,6 +3,8 @@
 
 #include "Analyzer.h"
 
+typedef llvm::SmallVector<llvm::Value *, 8> IndexVector;
+
 class CallGraphPass : public IterativeModulePass {
 
 private:
@@ -22,13 +24,12 @@ private:
 
   bool isCompositeType(Type *Ty);
   bool typeConfineInInitializer(User *Ini);
-  bool typeConfineInStore(StoreInst *SI);
+  bool typeConfineInStore(Value *, Value *);
   bool typeConfineInCast(CastInst *CastI);
   void escapeType(Type *Ty, int Idx = -1);
   void transitType(Type *ToTy, Type *FromTy, int ToIdx = -1, int FromIdx = -1);
 
-  Value *nextLayerBaseType(Value *V, Type *&BTy, int &Idx,
-                           const DataLayout *DL);
+  Type *nextLayerBaseType(Value *V, int &Idx, IndexVector *NextIndex = NULL);
 
   void funcSetIntersection(FuncSet &FS1, FuncSet &FS2, FuncSet &FS);
   bool findCalleesWithMLTA(CallInst *CI, FuncSet &FS);

@@ -11,7 +11,11 @@ PATH := $(CLANG_BIN_DIR):$(PATH)
 
 # List of target programs
 PROGS = \
-  test-mlta\
+  test-mlta-basic\
+  test-mlta-notassigned\
+  test-mlta-arr\
+  test-mlta-assign-value\
+  test-mlta-misc\
   test-inline\
   test-asminline\
   test-cast-struct\
@@ -40,6 +44,7 @@ cg-bin:
 .PHONY: $(PROGS)
 $(PROGS): %: %.c clang-check cg-bin
 	$(CC) $(CFLAGS) $(INC) -emit-llvm -c -o $@.bc $<
+#	$(CC) $(CFLAGS) $(INC) -emit-llvm -S -o $@.ll $<
 # .bclist is just a list of .bc files that will be analyzed together
 	echo $@.bc >$@.bclist
 	$(CG_BIN) -o $@.csv @$@.bclist 2>/dev/null
@@ -91,5 +96,6 @@ expected_calls: progs cg-test-template test-opt test-same-funcname
 clean:
 	cd cg-temp && make clean
 	find . -type f -name "*.bc" -delete
+	find . -type f -name "*.ll" -delete
 	find . -type f -name "*.bclist" -delete
 	find . -type f -name "*.csv" -and ! -name "expected_calls.csv" -delete
