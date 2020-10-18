@@ -15,6 +15,9 @@ PROGS = \
   test-mlta-notassigned\
   test-mlta-arr\
   test-mlta-assign-value\
+  test-mlta-confinestore\
+  test-mlta-memcpy\
+  test-mlta-null\
   test-mlta-misc\
   test-inline\
   test-asminline\
@@ -44,6 +47,7 @@ cg-bin:
 .PHONY: $(PROGS)
 $(PROGS): %: %.c clang-check cg-bin
 	$(CC) $(CFLAGS) $(INC) -emit-llvm -c -o $@.bc $<
+# To build .ll file:
 #	$(CC) $(CFLAGS) $(INC) -emit-llvm -S -o $@.ll $<
 # .bclist is just a list of .bc files that will be analyzed together
 	echo $@.bc >$@.bclist

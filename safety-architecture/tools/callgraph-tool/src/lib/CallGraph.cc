@@ -142,6 +142,7 @@ CallGraphPass::CallGraphPass(GlobalContext *Ctx_)
 // this call.
 void CallGraphPass::findCalleesWithType(CallInst *CI, FuncSet &S) {
 
+  LOG_OBJ("CallInst: ", CI);
   if (CI->isInlineAsm())
     return;
 
@@ -253,7 +254,8 @@ bool CallGraphPass::typeConfineInInitializer(User *Ini) {
     LOG_OBJ("Initializer: ", U);
 
     for (auto oi = U->op_begin(), oe = U->op_end(); oi != oe; ++oi) {
-      Value *O = *oi;
+      // Strip possible bitcasts
+      Value *O = (*oi)->stripPointerCasts();
       Type *OTy = O->getType();
 
       // Case 1: function address is assigned to a type
@@ -279,11 +281,6 @@ bool CallGraphPass::typeConfineInInitializer(User *Ini) {
         Type *ITy = U->getType();
         unsigned ONo = oi->getOperandNo();
         size_t h = typeIdxHash(ITy, ONo);
-        LOG_FMT("Adding to typeConfineMap: Type assigned to field idx [%u]\n",
-                ONo);
-        LOG_OBJ("assigned to type: ", ITy);
-        LOG_OBJ("assigned type: ", OTy);
-        typeConfineMap[h].insert(typeHash(OTy));
         LOG_FMT("Adding to typeHashes: %lu\n", h);
         typeHashes.insert(h);
 
@@ -310,12 +307,15 @@ bool CallGraphPass::typeConfineInInitializer(User *Ini) {
 bool CallGraphPass::typeConfineInStore(Value *Dst, Value *Src) {
 
   LOG_OBJ("Destination: ", Dst);
+  // Strip possible bitcasts
+  Src = Src->stripPointerCasts();
   LOG_FMT("Source: %s\n", Src->getName().str().c_str());
   IndexVector NextLayer;
   int FieldIdx = -1;
 
   // Case 1: The value operand is a function
   if (Function *F = dyn_cast<Function>(Src)) {
+    // Type *STyPrev = NULL;
     while (Type *STy = nextLayerBaseType(Dst, FieldIdx, &NextLayer)) {
       LOG_OBJ("Next layer type: ", STy);
       LOG_FMT("Adding to typeFuncsMap: Function [%s] assigned to field idx "
@@ -329,24 +329,7 @@ bool CallGraphPass::typeConfineInStore(Value *Dst, Value *Src) {
     return true;
   }
 
-  // Case 2: value-based store
-  // A composite-type object is stored
-  Type *EPTy = dyn_cast<PointerType>(Dst->getType())->getElementType();
-  Type *VTy = Src->getType();
-  if (isCompositeType(VTy)) {
-    if (isCompositeType(EPTy)) {
-      LOG_FMT("Adding to typeConfineMap: Type [%s] assigned to type [%s]\n",
-              VTy->getStructName().str().c_str(),
-              EPTy->getStructName().str().c_str());
-      typeConfineMap[typeHash(EPTy)].insert(typeHash(VTy));
-      return true;
-    } else {
-      escapeType(EPTy);
-      return false;
-    }
-  }
-
-  // Case 3: reference (i.e., pointer)-based store
+  // Case 2: reference (i.e., pointer)-based store
   if (isa<ConstantPointerNull>(Src))
     return false;
   // FIXME: Get the correct types
@@ -361,17 +344,13 @@ bool CallGraphPass::typeConfineInStore(Value *Dst, Value *Src) {
     LOG_OBJ("Next layer type: ", STy);
     // The value operand is a pointer to a composite-type object
     if (isCompositeType(EVTy)) {
-      LOG_FMT("Adding to typeConfineMap: Type assigned to field idx [%u]\n",
+      LOG_FMT("Adding to typeConfineMap: Type assigned to field idx [%i]\n",
               FieldIdx);
       LOG_OBJ("assigned to type: ", STy);
       LOG_OBJ("assigned type: ", EVTy);
-      typeConfineMap[typeIdxHash(STy, FieldIdx)].insert(typeHash(EVTy));
+      typeConfineMap[typeHash(STy)].insert(typeHash(EVTy));
       return true;
     } else {
-      // TODO: The type is escaping?
-      // Example: mm/mempool.c +188: pool->free = free_fn;
-      // free_fn is a function pointer from an function
-      // argument
       escapeType(STy, FieldIdx);
       return false;
     }
@@ -512,6 +491,11 @@ Type *CallGraphPass::nextLayerBaseType(Value *V, int &Idx,
   else if (LoadInst *LI = dyn_cast<LoadInst>(V)) {
     LOG("LoadInst");
     return nextLayerBaseType(LI->getOperand(0), Idx, Indices);
+  } else if (AllocaInst *AI = dyn_cast<AllocaInst>(V)) {
+    LOG_OBJ("AllocaInst: ", AI);
+    Type *Ty = AI->getAllocatedType();
+    LOG_OBJ("Allocated type: ", Ty);
+    return Ty;
   }
   // Other instructions such as CastInst
   // FIXME: may introduce false positives
@@ -568,19 +552,29 @@ bool CallGraphPass::findCalleesWithMLTA(CallInst *CI, FuncSet &FS) {
 
     // Step 2: get the funcset and merge
     FS2 = typeFuncsMap[TypeIdxHash];
-    auto TC = typeConfineMap[TypeIdxHash];
-    for (size_t hash : TC) {
-      LOG_FMT("TypeConfineMap hash: %lu\n", hash);
-      FuncSet FS3 = typeFuncsMap[hashIdxHash(hash, FirstIdx)];
-      FST.clear();
-      funcSetIntersection(FS1, FS3, FST);
-      if (!FST.empty())
-        FS1 = FST;
-    }
-
     funcSetIntersection(FS1, FS2, FST);
+    for (Function *Callee : FST)
+      LOG_FMT("Intersection after first merge: %s\n",
+              Callee->getName().str().c_str());
 
-    // Step 3: get transitted funcsets and merge
+    // Step 2b: get the funcset from typeConfineMap
+    auto TCit = typeConfineMap.find(TypeHash);
+    if (TCit != typeConfineMap.end()) {
+      for (size_t hash : TCit->second) {
+        LOG_FMT("typeConfineMap hash: %lu, with Idx: %i\n", hash, FirstIdx);
+        FS2 = typeFuncsMap[hashIdxHash(hash, FirstIdx)];
+        for (Function *Callee : FS2) {
+          LOG_FMT("FS2 (from type confine): %s\n",
+                  Callee->getName().str().c_str());
+        }
+        FST.insert(FS2.begin(), FS2.end());
+      }
+    }
+    for (Function *Callee : FST)
+      LOG_FMT("Intersection after typeconfine union: %s\n",
+              Callee->getName().str().c_str());
+
+      // Step 3: get transitted funcsets and merge
 #if 1
     list<size_t> LT;
     LT.push_back(TypeHash);
@@ -590,7 +584,6 @@ bool CallGraphPass::findCalleesWithMLTA(CallInst *CI, FuncSet &FS) {
 
       for (auto H : typeTransitMap[CT]) {
         FS2 = typeFuncsMap[hashIdxHash(H, FieldIdx)];
-        FST.clear();
         funcSetIntersection(FS1, FS2, FST);
         FS1 = FST;
       }
@@ -599,7 +592,8 @@ bool CallGraphPass::findCalleesWithMLTA(CallInst *CI, FuncSet &FS) {
     FS1 = FST;
     if (DEBUG) {
       for (Function *Callee : FS1)
-        LOG_FMT("Match: %s\n", Callee->getName().str().c_str());
+        LOG_FMT("Match after layer %i: %s\n", LayerNo,
+                Callee->getName().str().c_str());
     }
 
     if (NextLayer.empty()) {
@@ -649,6 +643,7 @@ bool CallGraphPass::doInitialization(Module *M) {
       Instruction *I = &*i;
 
       if (StoreInst *SI = dyn_cast<StoreInst>(I)) {
+        LOG_OBJ("Store inst: ", SI);
         typeConfineInStore(SI->getPointerOperand(), SI->getValueOperand());
       } else if (CastInst *CastI = dyn_cast<CastInst>(I)) {
         typeConfineInCast(CastI);
@@ -765,20 +760,18 @@ bool CallGraphPass::doModulePass(Module *M) {
         if (IntrinsicInst *II = dyn_cast<IntrinsicInst>(CI)) {
           LOG("LLVM internal instruction");
           Value *Dst = NULL;
+          Value *Src = NULL;
           if (MemCpyInst *M = dyn_cast<MemCpyInst>(II)) {
             LOG_OBJ("MemCpyInst ", M);
             Dst = M->getDest();
+            Src = M->getSource();
           } else if (MemMoveInst *M = dyn_cast<MemMoveInst>(II)) {
             LOG_OBJ("MemMoveInst", M);
             Dst = M->getDest();
+            Src = M->getSource();
           }
           if (Dst) {
-            int Idx;
-            Type *BTy = nextLayerBaseType(Dst, Idx);
-            if (BTy) {
-              LOG_OBJ("Escaping type: ", BTy);
-              escapeType(BTy, Idx);
-            }
+            typeConfineInStore(Dst, Src);
           }
           LOG("Skipping LLVM internal function");
           continue;
@@ -801,6 +794,12 @@ bool CallGraphPass::doModulePass(Module *M) {
           } else {
             indirectFoundWith = "MLTA";
             bool ret = findCalleesWithMLTA(CI, FS);
+            // To include in the output csv the cases where an indirect
+            // function is called, but not assigned anywhere in the
+            // target codebase, uncomment the following if statement:
+            // if (!ret) {
+            //   printCallGraphRow(CI, NULL, "indirect", "NOT_FOUND");
+            // }
             if (!ret && Ctx->analysisType != mlta_only) {
               findCalleesWithType(CI, FS);
               indirectFoundWith = "TA";

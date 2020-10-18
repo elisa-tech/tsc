@@ -110,6 +110,18 @@ def test_mlta_assign_value(set_up_test_data):
     check_function_calls_from("test-mlta-assign-value.bclist")
 
 
+def test_mlta_confinestore(set_up_test_data):
+    check_function_calls_from("test-mlta-confinestore.bclist")
+
+
+def test_mlta_memcpy(set_up_test_data):
+    check_function_calls_from("test-mlta-memcpy.bclist")
+
+
+def test_mlta_null(set_up_test_data):
+    check_function_calls_from("test-mlta-null.bclist")
+
+
 def test_mlta_misc(set_up_test_data):
     check_function_calls_from("test-mlta-misc.bclist")
 
