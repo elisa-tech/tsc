@@ -1,7 +1,8 @@
-wllvm
-wget
 colorlog
 graphviz
+networkx
+wget
+wllvm
 
 # dev requirements:
 pycodestyle
