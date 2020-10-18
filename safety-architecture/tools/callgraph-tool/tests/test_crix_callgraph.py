@@ -122,6 +122,10 @@ def test_mlta_null(set_up_test_data):
     check_function_calls_from("test-mlta-null.bclist")
 
 
+def test_mlta_x86_init(set_up_test_data):
+    check_function_calls_from("test-mlta-x86-init.bclist")
+
+
 def test_mlta_misc(set_up_test_data):
     check_function_calls_from("test-mlta-misc.bclist")
 

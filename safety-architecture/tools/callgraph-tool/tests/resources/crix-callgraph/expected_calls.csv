@@ -105,6 +105,8 @@
 "test-mlta-null.c","say_inner1","9","11","","printf","","direct","","",""
 "test-mlta-null.c","say_inner2","14","16","","printf","","direct","","",""
 "test-mlta-null.c","say_int","19","20","","printf","","direct","","",""
+"test-mlta-x86-init.c","main","76","79","test-mlta-x86-init.c","default_smp_read_mpc_oem","28","indirect","","","MLTA"
+"test-mlta-x86-init.c","main","76","80","test-mlta-x86-init.c","x86_init_uint_noop","26","indirect","","","MLTA"
 "test-opt.c","main","13","15","test-opt.c","do_nothing","9","direct","","",""
 "test-same-funcname.c","main","9","11","test-same-funcname.c","say_hello","4","direct","","",""
 "test-same-funcname.c","main","9","12","test-same-funcname.module.c","module_call","8","direct","","",""

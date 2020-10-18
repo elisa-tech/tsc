@@ -18,6 +18,7 @@ PROGS = \
   test-mlta-confinestore\
   test-mlta-memcpy\
   test-mlta-null\
+  test-mlta-x86-init\
   test-mlta-misc\
   test-inline\
   test-asminline\
