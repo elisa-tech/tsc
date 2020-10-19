@@ -35,6 +35,8 @@ class Grapher():
         # Node name = function, Default label = []
         labels = self.nodelabels.setdefault(node_name, [])
         # Add filename as new label
+        filename = filename if filename else "NaN"
+        line = line if line else "NaN"
         labels.append("%s:%s" % (filename, line))
         # Remove possible duplicate labels, preserving order
         labels = list(OrderedDict.fromkeys(labels))
