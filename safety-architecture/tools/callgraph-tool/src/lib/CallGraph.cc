@@ -761,6 +761,7 @@ bool CallGraphPass::doModulePass(Module *M) {
           LOG("LLVM internal instruction");
           Value *Dst = NULL;
           Value *Src = NULL;
+          // TODO: length, use offsets instead of indexes?
           if (MemCpyInst *M = dyn_cast<MemCpyInst>(II)) {
             LOG_OBJ("MemCpyInst ", M);
             Dst = M->getDest();
@@ -770,7 +771,7 @@ bool CallGraphPass::doModulePass(Module *M) {
             Dst = M->getDest();
             Src = M->getSource();
           }
-          if (Dst) {
+          if (Dst && Src) {
             typeConfineInStore(Dst, Src);
           }
           LOG("Skipping LLVM internal function");

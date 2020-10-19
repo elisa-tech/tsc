@@ -133,8 +133,8 @@ def find_all_chains(df, from_node, to_nodes, direction):
 
     _LOGGER.info("Filtering the paths...")
     if direction.cutoff:
-        _LOGGER.warning("Using cutoff length %s!"
-                        "The results might be incomplete!" % direction.cutoff)
+        _LOGGER.warning("Using cutoff %s, "
+                        "results might be incomplete" % direction.cutoff)
 
     rows = []
     for to_node in to_nodes:
@@ -271,7 +271,7 @@ def getargs():
     help = "selects search direction."
     parser.add_argument("--direction", help=help, choices=choices, default="right")
     help = "select cutoff length for path search"
-    parser.add_argument("--cutoff", help=help, type=int, default=None)
+    parser.add_argument("--cutoff", help=help, type=int, default=10)
     help = "set the verbosity level (e.g. -vv for debug level)"
     parser.add_argument(
         "-v", "--verbose", help=help, action="count", default=1)
