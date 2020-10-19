@@ -49,10 +49,13 @@ class Grapher():
             node_name, label, style='rounded,filled', fillcolor=fillcolor)
 
     def _add_edge(self, row):
+        edge_style = None
+        if row.callee_calltype == "indirect":
+            edge_style = "dashed"
         self.digraph.edge(
             "%s_%s" % (row.caller_filename, row.caller_function),
             "%s_%s" % (row.callee_filename, row.callee_function),
-            style=None)
+            style=edge_style)
 
     def graph(self, df):
         for row in df.itertuples():

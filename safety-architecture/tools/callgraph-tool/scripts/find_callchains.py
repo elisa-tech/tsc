@@ -232,10 +232,10 @@ def find_chains_directed_df(df, from_fun, to_fun, dir):
 
 def getargs():
     desc = "Find function call chains reachable from the input function."\
-        "The end of call chain is defined with second argument which is a"\
-        "regular expression matching one or more function names. The output"\
-        "is either the database of detected call chains in csv format or image"\
-        "of the detected subgraph"
+        " The end of call chain is defined with second argument which is a"\
+        " regular expression matching one or more function names. The output"\
+        " is either the database of detected call chains in csv format or image"\
+        " of the detected subgraph"
 
     epil = "Example: ./%s --from_function sock_recvmsg --to_function '^x64_sys'"\
         "--calls calls.csv" % os.path.basename(__file__)
