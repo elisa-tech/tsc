@@ -1,0 +1,2 @@
+"caller_filename","caller_function","caller_def_line","caller_line","callee_filename","callee_function","callee_line","callee_calltype","callee_inlined_from_file","callee_inlined_from_line","indirect_found_with"
+"test-chain.c","recursive_call","10","20","test-chain.c","recursive_call","10","direct","","",""
