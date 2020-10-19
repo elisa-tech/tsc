@@ -31,12 +31,13 @@ SearchSettings = namedtuple(
         "from_col_fn",
         "to_col_func",
         "to_col_fn",
-        "reverse"
+        "orientation",
+        "cutoff"
     ]
 )
 
 
-def search_settings(direction):
+def search_settings(direction, cutoff):
     left_search, right_search = None, None
     if direction == "both" or direction == "left":
         left_search = SearchSettings(
@@ -44,7 +45,8 @@ def search_settings(direction):
             from_col_fn="callee_filename",
             to_col_func="caller_function",
             to_col_fn="caller_filename",
-            reverse=True
+            orientation='reverse',
+            cutoff=cutoff
         )
     if direction == "both" or direction == "right":
         right_search = SearchSettings(
@@ -52,7 +54,8 @@ def search_settings(direction):
             from_col_fn="caller_filename",
             to_col_func="callee_function",
             to_col_fn="callee_filename",
-            reverse=False
+            orientation='original',
+            cutoff=cutoff
         )
     return left_search, right_search
 
@@ -113,14 +116,22 @@ def def_regex_filter(df, column, regex):
     return df[df[column].str.contains(regex, regex=True, na=False)]
 
 
-def get_bfs_tree_dir(g, from_node, direction):
-    return nx.bfs_tree(g, source=from_node, reverse=direction.reverse)
+def get_edge_bfs_dir(g, from_node, direction):
+    return nx.edge_bfs(g, source=from_node, orientation=direction.orientation)
 
 
 def find_all_chains(df, from_node, to_nodes, direction):
+    _LOGGER.info("Converting the database into a graph...")
     G = graph_from_df(df)
-    g_dir = get_bfs_tree_dir(G, from_node, direction)
+    _LOGGER.info("Generating paths from source function...")
+    g_edges = get_edge_bfs_dir(G, from_node, direction)
+    g_dir = nx.DiGraph()
+    for u, v, orientation in g_edges:
+        if orientation == 'reverse':
+            v, u = u, v
+        g_dir.add_edge(u, v)
     rows = []
+    _LOGGER.info("Filtering the paths...")
     for to_node in to_nodes:
         # check every dest node for possible paths from source
         if g_dir.has_node(to_node):
@@ -132,7 +143,7 @@ def find_all_chains(df, from_node, to_nodes, direction):
                 ])
                 continue
 
-            paths = nx.all_simple_paths(g_dir, from_node, to_node)
+            paths = nx.all_simple_paths(g_dir, from_node, to_node, cutoff=direction.cutoff)
             for path in paths:
                 chain = list(path)
                 if len(chain) > 2:
@@ -254,6 +265,8 @@ def getargs():
     choices = ["left", "right", "both"]
     help = "selects search direction."
     parser.add_argument("--direction", help=help, choices=choices, default="right")
+    help = "select cutoff lenght for path search"
+    parser.add_argument("--cutoff", help=help, type=int, default=10)
     help = "set the verbosity level (e.g. -vv for debug level)"
     parser.add_argument(
         "-v", "--verbose", help=help, action="count", default=1)
@@ -271,7 +284,7 @@ if __name__ == "__main__":
     df = df_all.drop_duplicates()
 
     from_fun, to_fun = args.from_function, args.to_function
-    left, right = search_settings(args.direction)
+    left, right = search_settings(args.direction, args.cutoff)
 
     merge_on = ["caller_filename", "caller_function", "callee_filename", "callee_function"]
     chains_df_right = pd.DataFrame(columns=merge_on)
@@ -282,6 +295,7 @@ if __name__ == "__main__":
     if left:
         chains_df_left = find_chains_directed_df(df, from_fun, to_fun, left)
 
+    _LOGGER.info("Generating the results...")
     df_chains = pd.concat([chains_df_left, chains_df_right]).drop_duplicates()
     df_chains = pd.merge(df_all, df_chains, on=merge_on, how='inner')
     if args.out.endswith(".csv"):
