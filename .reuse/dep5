@@ -1,0 +1,9 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+
+Files: safety-architecture/tools/callgraph-tool/tests/resources/*
+Copyright: 2020 callgraph-tool authors. All rights reserved.
+License: Apache-2.0
+
+Files: safety-architecture/tools/callgraph-tool/doc/*
+Copyright: 2020 callgraph-tool authors. All rights reserved.
+License: Apache-2.0

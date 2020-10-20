@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# SPDX-FileCopyrightText: 2020 callgraph-tool authors. All rights reserved
+#
+# SPDX-License-Identifier: Apache-2.0
+
 ################################################################################
 
 MYNAME=$0

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2020 callgraph-tool authors. All rights reserved
+//
+// SPDX-License-Identifier: LicenseRef-LLVM
+
 //===-- Analyzer.cc - the kernel-analysis framework--------------===//
 //
 // This file implements the analysis framework. It calls the pass for

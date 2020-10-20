@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2020 callgraph-tool authors. All rights reserved
+
+SPDX-License-Identifier: Apache-2.0
+-->
 
 # Callgraph
 

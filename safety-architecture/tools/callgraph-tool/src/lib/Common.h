@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2020 callgraph-tool authors. All rights reserved
+//
+// SPDX-License-Identifier: LicenseRef-LLVM
+
 #ifndef COMMON_H
 #define COMMON_H
 

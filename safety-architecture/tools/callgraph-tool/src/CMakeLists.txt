@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2020 callgraph-tool authors. All rights reserved
+#
+# SPDX-License-Identifier: LicenseRef-LLVM
+
 cmake_minimum_required(VERSION 3.5.1)
 project(CALLGRAPH)
 

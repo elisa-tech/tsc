@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2020 callgraph-tool authors. All rights reserved
+//
+// SPDX-License-Identifier: LicenseRef-LLVM
+
 #include "llvm/IR/DebugInfoMetadata.h"
 #include <regex>
 

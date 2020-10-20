@@ -1,6 +1,11 @@
+# SPDX-FileCopyrightText: 2020 callgraph-tool authors. All rights reserved
+#
+# SPDX-License-Identifier: Apache-2.0
+
 colorlog
 graphviz
 networkx
+pandas
 wget
 wllvm
 
@@ -8,4 +13,4 @@ wllvm
 pycodestyle
 pytest
 pytest-cov
-pandas
+reuse

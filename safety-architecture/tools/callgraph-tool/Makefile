@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2020 callgraph-tool authors. All rights reserved
+#
+# SPDX-License-Identifier: Apache-2.0
+
 SHELL := /bin/bash
 LLVM_DIR := /usr/lib/llvm-10
 CRIXCG_SRC_DIR := ${CURDIR}/src

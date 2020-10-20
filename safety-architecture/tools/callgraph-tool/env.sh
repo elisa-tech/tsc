@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# SPDX-FileCopyrightText: 2020 callgraph-tool authors. All rights reserved
+#
+# SPDX-License-Identifier: Apache-2.0
+
 export CLANG_BIN_DIR=/usr/lib/llvm-10/bin/
 
 if [ ! -d $CLANG_BIN_DIR ]; then
