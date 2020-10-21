@@ -4,9 +4,9 @@ SPDX-FileCopyrightText: 2020 callgraph-tool authors. All rights reserved
 SPDX-License-Identifier: Apache-2.0
 -->
 
-# Licence and Copyright information in the callgraph-tool
+# License and Copyright information in the callgraph-tool
 
-We are doing our best to keep all the licencing and copyright information in place.
+We are doing our best to keep all the licensing and copyright information in place.
 Please follow the guidelines bellow for your contributions. The requirement is installation
 of `reuse` tool:
 ```
@@ -20,9 +20,9 @@ about the people (developers) who contribute (or have contributed) the project a
 [CONTRIBUTORS](../../CONTRIBUTORS) file. Make sure that you add your name in the first PR to
 the tool.
 
-## Licences
-We use Apache-2.0 licence for all the files in the repository. The exception is `crix` core,
-where original LLVM licence is kept. This is available under name `LicenseRef-LLVM.txt` in the
+## Licenses
+We use Apache-2.0 license for all the files in the repository. The exception is `crix` core,
+where original LLVM license is kept. This is available under name `LicenseRef-LLVM.txt` in the
 [LICENSES](../../LICENSES) directory. 
 
 
@@ -30,17 +30,17 @@ where original LLVM licence is kept. This is available under name `LicenseRef-LL
 
 If you are modifying the existing file then there is in most cases no need for any action.
 When adding the new file it is required to add licensing and copyright information. This can
-be either done by simply copying the copyright and licence information from other files in the
+be either done by simply copying the copyright and license information from other files in the
 same format of using the `reuse` tool:
 ```
 reuse addheader <NAME_OF_NEW_FILE>\
     --copyright "callgraph-tool authors. All rights reserved"\
-    --licence Apache-2.0
+    --license Apache-2.0
     --year <CURRENT_YEAR>\
     --style <FILE_STYLE>\
 ```
 
-If you are adding multiple files or files that don't have editable header you can licence the
+If you are adding multiple files or files that don't have editable header you can license the
 whole file by adding the appropriate entry in ./reuse/dep5 file. For example, the copyright
 and license information for entire contents of `doc` directory can be defined as:
 ```
@@ -49,7 +49,7 @@ Copyright: 2020 callgraph-tool authors. All rights reserved.
 License: Apache-2.0
 ```
 
-Before commiting/pushing the file make sure that the reuse conformance is kept with:
+Before committing/pushing the file make sure that the reuse conformance is kept with:
 ```
 reuse lint
 ```
