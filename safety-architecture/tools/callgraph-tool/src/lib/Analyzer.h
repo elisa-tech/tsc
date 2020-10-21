@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2020 callgraph-tool authors. All rights reserved
+//
+// SPDX-License-Identifier: LicenseRef-LLVM
+
 #ifndef ANALYZER_GLOBAL_H
 #define ANALYZER_GLOBAL_H
 

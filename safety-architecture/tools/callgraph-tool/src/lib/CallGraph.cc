@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2020 callgraph-tool authors. All rights reserved
+//
+// SPDX-License-Identifier: LicenseRef-LLVM
+
 //===-- CallGraph.cc - Build global call-graph------------------===//
 //
 // This pass builds a global call-graph. The targets of an indirect

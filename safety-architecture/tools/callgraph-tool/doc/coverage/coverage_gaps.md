@@ -1,7 +1,7 @@
 <!--
-SPDX-FileCopyrightText: 2019 Bayerische Motoren Werke Aktiengesellschaft (BMW AG)
+SPDX-FileCopyrightText: 2020 Bayerische Motoren Werke Aktiengesellschaft (BMW AG)
 
-SPDX-License-Identifier: CC-BY-SA-4.0
+SPDX-License-Identifier: Apache-2.0
 -->
 
 # Coverage Gaps
