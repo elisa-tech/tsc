@@ -41,7 +41,7 @@ reuse addheader <NAME_OF_NEW_FILE>\
 ```
 
 If you are adding multiple files or files that don't have editable header you can license the
-whole file by adding the appropriate entry in ./reuse/dep5 file. For example, the copyright
+entire directory  by adding the appropriate entry in ./reuse/dep5 file. For example, the copyright
 and license information for entire contents of `doc` directory can be defined as:
 ```
 Files: doc/*
