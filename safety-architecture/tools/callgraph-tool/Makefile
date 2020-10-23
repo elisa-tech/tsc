@@ -81,7 +81,7 @@ pre-push: test style clean ## Run tests, style, and clean
 	$(call target_success,$@)
 
 test: crix-callgraph ## Build and run tests
-	pytest -vx tests/
+	python3 -m pytest -vx tests/
 	$(call target_success,$@)
 
 style-pyc: ## Check with pycodestyle

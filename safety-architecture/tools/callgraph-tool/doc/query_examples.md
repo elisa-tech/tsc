@@ -31,10 +31,10 @@ The below instructions also assume you have setup the `$KERNEL` and `$CG_DIR` va
 ## Building kernel bitcode files with compiler optimizations disabled
 Compiler optimizations and function inlining impact the callgraph output: this is by design and generally desired.
 
-In these instructions, however, we are going to use kernel bitcode files build with compiler optimizations disabled i.e. `-O0`. In addition, we are going to re-define the `__always_inline` macro to not force function inlines for any functions. The main reason for disabling both  the compiler optimizations and function inlining is to make the visualized function callgraphs more faithfully represent the C-source code, in order to make the call chains easier to follow from the source code.
+In these instructions, however, we are going to use kernel bitcode files build with compiler optimizations disabled i.e. `-O0`. In addition, we are going to re-define the `__always_inline` macro to not force function inlines for any functions. The main reason for disabling both the compiler optimizations and function inlining is to make the visualized function callgraphs more faithfully represent the C-source code, in order to make the call chains easier to follow from the source code.
 
 #### Patch compiler_attributes.h
-We need to edit the file include/linux/compiler_attributes.h macro `__always_inline` definition to disable forced function inlines as follows:
+We need to edit the file `include/linux/compiler_attributes.h` macro `__always_inline` definition to disable forced function inlines as follows:
 ```
 /* Around line 70: comment out
  * #define __always_inline                 inline __attribute__((__always_inline__))
@@ -114,7 +114,7 @@ Output:
 <img src=sock_recvmsg_d1.png>
 <br /><br />
 
-The output graph shows that function `sock_recvmsg` is defined in file net/socket.c on line 900. It calls three functions: `msg_data_left`, `security_socket_recvmsg`, and `sock_recvmsg_nosec`. The calls to these functions takes place from net/socket.c on lines 902, 902, and 904. The three called functions are defined in include/linux/socket.h:157, security/security.c:2127, and net/socket.c:883 respectively. Notice the node labels refer each function's definition, not declaration location.
+The output graph shows that function `sock_recvmsg` is defined in file net/socket.c on line 900. It calls three functions: `msg_data_left`, `security_socket_recvmsg`, and `sock_recvmsg_nosec`. The calls to these functions takes place from net/socket.c on lines 901, 901, and 903. The three called functions are defined in include/linux/socket.h:158, security/security.c:2127, and net/socket.c:882 respectively. Notice the node labels refer each function's definition, not declaration location.
 
 Increasing the `--depth` argument makes the query_callgraph.py walk the call chains deeper. For instance, with `--depth 2`, the output becomes:
 
@@ -145,7 +145,7 @@ Output:
 <img src=sock_recvmsg_d1_inverse.png>
 <br /><br />
 
-The output graph now shows that there are ten functions that can call `sock_recvmsg`: for instance, the function `io_recv`, which is defined in fs/io_uring.c on line 3906, calls `sock_recvmsg` on line 3947. The dashed line means that there is one function, namely `security_socket_sendmsg`, where `sock_recvmsg` is possibly called through a function pointer.
+The output graph now shows that there are ten functions that can call `sock_recvmsg`: for instance, the function `io_recv`, which is defined in fs/io_uring.c on line 4381, calls `sock_recvmsg` on line 4421.
 
 Again, increasing the `--depth` argument makes the query_callgraph.py walk the call chains deeper. For instance, with `--inverse` and `--depth 2`, the output becomes:
 
@@ -179,7 +179,7 @@ We use the `--until_function` to stop drawing when the call chain reaches a func
 <img src=sock_recvmsg_syscalls.png>
 <br /><br />
 
-The output graph shows that there are three syscalls whose call chain might reach `sock_recvmsg`: `__x64_sys_recvfrom`, `__x64_sys_recv`, and `__x64_sys_socketcall` defined at net/socket.c:2066, net/socket.c:2077, and net/socket.c:2852 respectively.
+The output graph shows that there are three syscalls whose call chain might reach `sock_recvmsg`: `__x64_sys_recvfrom`, `__x64_sys_recv`, and `__x64_sys_socketcall` defined at net/socket.c:2063, net/socket.c:2074, and net/socket.c:2853 respectively.
 
 #### Example: visualizing coverage data 
 query_callgraph.py allows adding function coverage information to the graph visualizations. The expected coverage format is a csv file with the following headers: filename, function, and percent:

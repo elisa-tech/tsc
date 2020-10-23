@@ -28,7 +28,7 @@ Table of Contents
 
 
 ## Getting started
-These setup instructions have been tested on Ubuntu 18.04.
+These setup instructions have been tested on Ubuntu 18.04 and 20.04.
 
 Checkout callgraph:
 ```
@@ -50,13 +50,16 @@ cd $CG_DIR
 pip3 install -r requirements.txt
 ```
 
-You also need the target kernel source tree. For the sake of example, we use the mainline tree:
+You also need the target kernel source tree. For the sake of example, we use the stable tree:
 ```
 cd ~   # wherever you prefer to clone the kernel tree to
-git clone https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+git clone https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git
+cd linux-stable
+git checkout v5.9  # we'll use v5.9 as an example
 
 # We assume $KERNEL contains the path to the target kernel tree root
-KERNEL=$(pwd)/linux
+KERNEL=$(pwd)
+
 ```
 
 ## Generating callgraph database
