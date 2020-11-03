@@ -12,6 +12,7 @@ import graphviz as gv
 import pandas as pd
 import re
 import utils
+import html
 from collections import OrderedDict
 from difflib import SequenceMatcher
 
@@ -25,12 +26,14 @@ _LOGGER = logging.getLogger(utils.LOGGER_NAME)
 class CallGraphFilter():
     def __init__(
             self,
-            caller_function=None, caller_filename=None,
-            callee_function=None, callee_filename=None):
+            caller_function=None, caller_filename=None, caller_def_line=None,
+            callee_function=None, callee_filename=None, callee_line=None):
         self.caller_function = caller_function
         self.caller_filename = caller_filename
+        self.caller_def_line = caller_def_line
         self.callee_function = callee_function
         self.callee_filename = callee_filename
+        self.callee_line = callee_line
 
     def get_query_str(self):
         return ' & '.join(
@@ -42,8 +45,13 @@ class CallGraphFilter():
             return (
                 self.caller_function == other.caller_function and
                 self.caller_filename == other.caller_filename and
+                (self.caller_def_line == other.caller_def_line or
+                 (not self.caller_def_line or not other.caller_def_line)) and
                 self.callee_function == other.callee_function and
-                self.callee_filename == other.callee_filename)
+                self.callee_filename == other.callee_filename and
+                (self.callee_line == other.callee_line or
+                 (not self.callee_line or not other.callee_line))
+            )
         return False
 
 
@@ -147,6 +155,12 @@ class Grapher():
                     filename, require_cols))
             exit(1)
 
+        # Graphviz apparently doesn't like colons in node names
+        self.df['caller_function'] = self.df.caller_function.str.replace(
+            ':', '@')
+        self.df['callee_function'] = self.df.callee_function.str.replace(
+            ':', '@')
+
     def _load_coverage_data(self, filename):
         utils.exit_unless_accessible(filename)
         self.df_cov = pd.read_csv(filename, sep=None, engine='python')
@@ -239,6 +253,8 @@ class Grapher():
                 _LOGGER.debug(
                     "%sSkipping duplicate path" % (DBG_INDENT*(curr_depth-1)))
                 continue
+            if pd.isna(row.caller_function) or pd.isna(row.callee_function):
+                continue
 
             # Add caller node
             self._add_node(
@@ -262,11 +278,15 @@ class Grapher():
             if self.inverse:
                 filter = CallGraphFilter(
                     callee_function=row.caller_function,
-                    callee_filename=row.caller_filename)
+                    callee_filename=row.caller_filename,
+                    callee_line=str(row.caller_def_line).split('.')[0]
+                )
             else:
                 filter = CallGraphFilter(
                     caller_function=row.callee_function,
-                    caller_filename=row.callee_filename)
+                    caller_filename=row.callee_filename,
+                    caller_def_line=str(row.callee_line).split('.')[0]
+                )
 
             # Recursively find the next entries
             self._graph(filter, curr_depth)
@@ -312,23 +332,27 @@ class Grapher():
             end = "</FONT>"
             label = "<%s%s%s>" % (beg, str(row.caller_line).split('.')[0], end)
             self.digraph.edge(
-                "%s_%s" % (row.caller_filename, row.caller_function),
-                "%s_%s" % (row.callee_filename, row.callee_function),
+                node_id(row.caller_filename, row.caller_function,
+                        row.caller_def_line),
+                node_id(row.callee_filename,
+                        row.callee_function, row.callee_line),
                 label=label,
                 style=edge_style)
         else:
             self.digraph.edge(
-                "%s_%s" % (row.caller_filename, row.caller_function),
-                "%s_%s" % (row.callee_filename, row.callee_function),
+                node_id(row.caller_filename, row.caller_function,
+                        row.caller_def_line),
+                node_id(row.callee_filename,
+                        row.callee_function, row.callee_line),
                 style=edge_style)
 
     def _add_node(self, function, filename, line):
         if self.df_out_csv is not None:
             return
-        function = str(function)
         filename = str(filename)
         line = str(line).split('.')[0]
-        node_name = "%s_%s" % (filename, function)
+        node_name = node_id(filename, function, line)
+        function = html.escape(str(function))
         # Node name = function, Default label = []
         labels = self.nodelabels.setdefault(node_name, [])
         # Add filename as new label
@@ -432,6 +456,14 @@ def regex_match(regex, s):
     if (not regex or not s):
         return False
     return re.match(regex, s) is not None
+
+
+def node_id(filename, function, line):
+    return "%s_%s_%s" % (
+        filename,
+        html.escape(str(function)),
+        float(line)
+    )
 
 
 def getargs():

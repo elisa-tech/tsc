@@ -42,6 +42,15 @@ cl::opt<AnalysisType> optAnalysisType(
             "Find targets of indirect calls based on type analysis (TA)")),
     cl::cat(CallgraphCategory));
 
+cl::opt<Demangle> optDemangle(
+    cl::desc("Demangle C++ function names:"),
+    cl::values(clEnumVal(demangle_debug_only,
+                         "Demangle function names that are "
+                         "associated with debug info (default)"),
+               clEnumVal(demangle_all, "Demangle all function names"),
+               clEnumVal(demangle_none, "Don't demangle function names")),
+    cl::cat(CallgraphCategory));
+
 GlobalContext GlobalCtx;
 
 void IterativeModulePass::run(ModuleList &modules) {
@@ -131,6 +140,7 @@ int main(int argc, char **argv) {
   const string yellow("\033[1;33m");
   const string reset("\033[0m");
   GlobalCtx.analysisType = optAnalysisType;
+  GlobalCtx.demangle = optDemangle;
   GlobalCtx.csvout.open(optOutFilename);
   SMDiagnostic Err;
 

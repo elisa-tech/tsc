@@ -12,8 +12,10 @@
 //
 //===-----------------------------------------------------------===//
 
+#include "llvm/Demangle/Demangle.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
+#include "llvm/IR/TypeFinder.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
 #include "CallGraph.h"
@@ -24,8 +26,12 @@ using namespace std;
 DenseMap<size_t, FuncSet> CallGraphPass::typeFuncsMap;
 unordered_map<size_t, set<size_t>> CallGraphPass::typeConfineMap;
 unordered_map<size_t, set<size_t>> CallGraphPass::typeTransitMap;
+// TODO: typeTransitTypeMap should be build in a separate pass
+unordered_map<size_t, set<Type *>> CallGraphPass::typeTransitTypeMap;
+unordered_map<std::string, set<Type *>> CallGraphPass::structTypeMap;
 set<size_t> CallGraphPass::typeEscapeSet;
 
+#include <llvm/IR/DebugInfo.h>
 #include <llvm/IR/DebugInfoMetadata.h>
 #include <llvm/IR/DebugLoc.h>
 
@@ -41,12 +47,10 @@ CallGraphDebugInfo readDebugInfo(CallInst *caller_cinst,
   struct CallGraphDebugInfo info;
   Instruction *caller_inst = dyn_cast<Instruction>(caller_cinst);
   if (!caller_inst) {
-    // llvm::errs() << "Warning: caller_cinst is not an Instruction\n";
     return info;
   }
   const llvm::DebugLoc &debugInfo = caller_inst->getDebugLoc();
   if (!debugInfo) {
-    // llvm::errs() << "Warning: missing debug info\n";
     return info;
   }
 
@@ -64,8 +68,6 @@ CallGraphDebugInfo readDebugInfo(CallInst *caller_cinst,
       break;
     }
   }
-
-  // string caller_directory = debugInfo->getDirectory();
   return info;
 }
 
@@ -99,7 +101,11 @@ void CallGraphPass::printCallGraphRow(CallInst *caller_cinst,
     if (callee_sp) {
       callee_line = to_string(callee_sp->getLine());
       callee_filename = callee_sp->getFilename().str();
+      if (Ctx->demangle == demangle_debug_only)
+        callee_name = callee_sp->getName().str();
     }
+    if (Ctx->demangle == demangle_all)
+      callee_name = demangle(callee_name);
   }
 
   string caller_line = "";
@@ -114,11 +120,18 @@ void CallGraphPass::printCallGraphRow(CallInst *caller_cinst,
     if (caller_sp) {
       caller_line_funcdef = to_string(caller_sp->getLine());
       caller_filename = caller_sp->getFilename().str();
+      if (Ctx->demangle == demangle_debug_only)
+        caller_name = caller_sp->getName().str();
     } else if (Module *m = caller_func->getParent()) {
       caller_filename = m->getSourceFileName();
     }
+    if (Ctx->demangle == demangle_all)
+      caller_name = demangle(caller_name);
   }
 
+  if (caller_name.empty() || callee_name.empty()) {
+    return;
+  }
   CallGraphDebugInfo info = readDebugInfo(caller_cinst, caller_filename);
 
   Ctx->csvout << ""
@@ -363,6 +376,14 @@ bool CallGraphPass::typeConfineInStore(Value *Dst, Value *Src) {
   return false;
 }
 
+Type *getPointerType(Type *T) {
+  if (PointerType *PT = dyn_cast<PointerType>(T)) {
+    return getPointerType(PT->getElementType());
+  } else {
+    return T;
+  }
+}
+
 bool CallGraphPass::typeConfineInCast(CastInst *CastI) {
 
   LOG_OBJ("CastInst: ", CastI);
@@ -375,18 +396,27 @@ bool CallGraphPass::typeConfineInCast(CastInst *CastI) {
   Type *ToTy = ToV->getType(), *FromTy = FromV->getType();
   if (isCompositeType(FromTy)) {
     transitType(ToTy, FromTy);
+    LOG("isCompositeType, done");
     return true;
   }
 
   if (!FromTy->isPointerTy() || !ToTy->isPointerTy())
     return false;
-  Type *EToTy = dyn_cast<PointerType>(ToTy)->getElementType();
-  Type *EFromTy = dyn_cast<PointerType>(FromTy)->getElementType();
+
+  Type *EToTy = getPointerType(ToTy);
+  Type *EFromTy = getPointerType(FromTy);
+
+  if (isCompositeType(EToTy) && isCompositeType(EFromTy)) {
+    LOG("Adding to typeTransitTypeMap: ");
+    LOG_OBJ("EToType: ", EToTy);
+    LOG_OBJ("EFromType: ", EFromTy);
+    typeTransitTypeMap[typeHash(EFromTy)].insert(EToTy);
+  }
+
   if (isCompositeType(EToTy) && isCompositeType(EFromTy)) {
     transitType(EToTy, EFromTy);
     return true;
   }
-
   return false;
 }
 
@@ -587,6 +617,7 @@ bool CallGraphPass::findCalleesWithMLTA(CallInst *CI, FuncSet &FS) {
       LT.pop_front();
 
       for (auto H : typeTransitMap[CT]) {
+        LOG_FMT("typeTransitMap: from:%lu --> to:%lu\n", H, CT);
         FS2 = typeFuncsMap[hashIdxHash(H, FieldIdx)];
         funcSetIntersection(FS1, FS2, FST);
         FS1 = FST;
@@ -611,6 +642,101 @@ bool CallGraphPass::findCalleesWithMLTA(CallInst *CI, FuncSet &FS) {
   return true;
 }
 
+string getNamespace(DIScope *S) {
+  if (!S) {
+    return "";
+  }
+  string ns = getNamespace(S->getScope());
+  if (!ns.empty())
+    return ns + S->getName().str() + "::";
+  else
+    return S->getName().str() + "::";
+}
+
+void CallGraphPass::typeConfineInGlobalVarInit(Constant *Ini) {
+
+  Type *FromTy = getPointerType(Ini->stripPointerCasts()->getType());
+  Type *ToTy = getPointerType(Ini->getType());
+
+  if (FromTy == ToTy) {
+    return;
+  }
+
+  Use *OL = Ini->getOperandList();
+  SmallVector<DIGlobalVariableExpression *, 1> GVs;
+  for (unsigned I = 0; I < Ini->getNumOperands(); ++I) {
+    LOG_OBJ("Operand: ", OL[I]);
+    GlobalVariable *GV = dyn_cast<GlobalVariable>(OL[I]);
+    if (!GV) {
+      continue;
+    }
+    GV->getDebugInfo(GVs);
+    for (auto *GVE : GVs) {
+      DIType *DTy = GVE->getVariable()->getType();
+      if (DTy == NULL) {
+        continue;
+      }
+      LOG_OBJ("DIVariable type:", DTy);
+      string TyName = DTy->getName().str();
+      string NS = getNamespace(DTy->getScope());
+      if (DTy->getTag() == dwarf::DW_TAG_class_type) {
+        TyName = "class." + NS + TyName;
+      } else {
+        continue;
+      }
+      LOG_FMT("TyName: %s\n", TyName.c_str());
+      auto TSI = structTypeMap.find(TyName);
+      if (TSI == structTypeMap.end()) {
+        continue;
+      }
+      for (Type *FromTy : TSI->second) {
+        LOG("Adding to typeTransitTypeMap: ");
+        LOG_OBJ("ToType: ", ToTy);
+        LOG_OBJ("FromType: ", FromTy);
+        typeTransitTypeMap[typeHash(FromTy)].insert(ToTy);
+      }
+    }
+  }
+}
+
+void CallGraphPass::addStructTypeCallSignature(StructType *ST, Function *F) {
+  static regex reg("([^,]+?\\([%@]?\"?)[^),*\"]+(.*)");
+  string subst = "$1" + ST->getStructName().str() + "$2";
+  LOG_FMT("Subst string: %s\n", subst.c_str());
+  Ctx->sigFuncsMap[funcHash(F, false, &reg, &subst)].insert(F);
+}
+
+void CallGraphPass::addAddressTakenFunction(Function *F) {
+  LOG_FMT("adding to AddressTakenFuncs: %s\n", F->getName().str().c_str());
+  Ctx->AddressTakenFuncs.insert(F);
+  LOG_FMT("adding to sigFuncsMap: %s\n", F->getName().str().c_str());
+  Ctx->sigFuncsMap[funcHash(F, false)].insert(F);
+
+  auto AI = F->arg_begin();
+  if (AI == F->arg_end()) {
+    return;
+  }
+  Type *ArgTy = getPointerType(AI->getType());
+  LOG_OBJ("First argument type: ", ArgTy);
+
+  if (!ArgTy->isStructTy()) {
+    LOG("First argument type is not a struct, skipping");
+    return;
+  }
+
+  auto TT = typeTransitTypeMap.find(typeHash(ArgTy));
+  if (TT == typeTransitTypeMap.end()) {
+    LOG("First argument type is not in typeTransitTypeMap, skipping");
+    return;
+  }
+  for (Type *T : TT->second) {
+    LOG_OBJ("Found from typeTransitTypeMap: ", T);
+    if (T->isStructTy()) {
+      addStructTypeCallSignature(dyn_cast<StructType>(T), F);
+    }
+  }
+}
+
 bool CallGraphPass::doInitialization(Module *M) {
 
   LOG_FMT("Module: %s\n", M->getName().str().c_str());
@@ -619,15 +745,21 @@ bool CallGraphPass::doInitialization(Module *M) {
   Int8PtrTy = Type::getInt8PtrTy(M->getContext());
   IntPtrTy = DL->getIntPtrType(M->getContext());
 
-  //
+  // Iterate struct types
+  llvm::TypeFinder StructTypes;
+  StructTypes.run(*M, true);
+  for (StructType *STy : StructTypes) {
+    structTypeMap[STy->getName().str()].insert(STy);
+  }
+
   // Iterate and process globals
-  //
   for (Module::global_iterator gi = M->global_begin(); gi != M->global_end();
        ++gi) {
     GlobalVariable *GV = &*gi;
     if (!GV->hasInitializer())
       continue;
     Constant *Ini = GV->getInitializer();
+    typeConfineInGlobalVarInit(Ini);
     if (!isa<ConstantAggregate>(Ini))
       continue;
 
@@ -656,11 +788,7 @@ bool CallGraphPass::doInitialization(Module *M) {
 
     // Collect address-taken functions.
     if (F.hasAddressTaken()) {
-      LOG("hasAddressTaken");
-      LOG_FMT("adding to AddressTakenFuncs: %s\n", F.getName().str().c_str());
-      Ctx->AddressTakenFuncs.insert(&F);
-      LOG_FMT("adding to sigFuncsMap: %s\n", F.getName().str().c_str());
-      Ctx->sigFuncsMap[funcHash(&F, false)].insert(&F);
+      addAddressTakenFunction(&F);
     }
 
     // Collect global function definitions.
@@ -676,11 +804,6 @@ bool CallGraphPass::doInitialization(Module *M) {
     size_t fh = funcHash(&F);
     if (Ctx->UnifiedFuncMap.find(fh) == Ctx->UnifiedFuncMap.end()) {
       Ctx->UnifiedFuncMap[fh] = &F;
-
-      if (F.hasAddressTaken()) {
-        LOG_FMT("adding to sigFuncsMap: %s\n", F.getName().str().c_str());
-        Ctx->sigFuncsMap[funcHash(&F, false)].insert(&F);
-      }
     }
   }
 
@@ -706,6 +829,31 @@ bool CallGraphPass::doInitialization(Module *M) {
       os << "\n";
     }
     LOG(os.str().c_str());
+    os.str("");
+    os.clear();
+    LOG("typeTransitMap:");
+    for (auto const &pair : typeTransitMap) {
+      os << "[Key:" << to_string(pair.first) << "]: ";
+      for (size_t second : pair.second) {
+        os << to_string(second) << " ";
+      }
+      os << "\n";
+    }
+    LOG(os.str().c_str());
+    string s;
+    llvm::raw_string_ostream rso(s);
+    LOG("typeTransitTypeMap:");
+    for (auto const &pair : typeTransitTypeMap) {
+      rso << "[Key:" << to_string(pair.first) << "]: ";
+      for (Type *second : pair.second) {
+        rso << "'";
+        second->print(rso);
+        rso << "' ";
+      }
+      rso << "\n";
+    }
+    LOG(rso.str().c_str());
+
     LOG("UnifiedFuncMap:");
     for (auto const &pair : Ctx->UnifiedFuncMap) {
       LOG(("[Key:" + to_string(pair.first) +
@@ -845,6 +993,5 @@ bool CallGraphPass::doModulePass(Module *M) {
       }
     }
   }
-
   return false;
 }

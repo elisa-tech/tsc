@@ -81,6 +81,11 @@ def check_function_calls_from(target_bclist_file_name):
     caller_regex = "^%s" % os.path.splitext(target_bclist_file_name)[0]
     df_expected = df_regex_filter(df_expected, "caller_filename", caller_regex)
     df_generated = pd.read_csv(outfile)
+    # Remove entries where caller or callee function name begins with '__cxx'.
+    # These are library functions we want to ignore in the tests:
+    df_generated = df_generated[
+        ~df_generated["caller_function"].str.startswith("__cxx", na=False) &
+        ~df_generated["callee_function"].str.startswith("__cxx", na=False)]
     df_diff = test_utils.df_difference(df_expected, df_generated)
     assert df_diff.empty, test_utils.df_to_string(df_diff)
 
@@ -168,6 +173,51 @@ def test_same_funcname(set_up_test_data):
 
 def test_ta_mlta(set_up_test_data):
     check_function_calls_from("test-ta-mlta.bclist")
+
+
+def test_union(set_up_test_data):
+    check_function_calls_from("test-union.bclist")
+
+
+def test_hello_cpp(set_up_test_data):
+    check_function_calls_from("test-hello.bclist")
+
+
+def test_inheritance_basic_cpp(set_up_test_data):
+    check_function_calls_from("test-inheritance-basic.bclist")
+
+
+def test_inheritance_global_cpp(set_up_test_data):
+    check_function_calls_from("test-inheritance-global.bclist")
+
+
+def test_inheritance_multilevel_cpp(set_up_test_data):
+    check_function_calls_from("test-inheritance-multilevel.bclist")
+
+
+def test_inheritance_multiple_1_cpp(set_up_test_data):
+    check_function_calls_from("test-inheritance-multiple-1.bclist")
+
+
+# Below test case does not work correctly at the moment:
+# def test_inheritance_multiple_2_cpp(set_up_test_data):
+#     check_function_calls_from("test-inheritance-multiple-2.bclist")
+
+
+def test_inheritance_multiple_3_cpp(set_up_test_data):
+    check_function_calls_from("test-inheritance-multiple-3.bclist")
+
+
+def test_namespace_1_cpp(set_up_test_data):
+    check_function_calls_from("test-namespace-1.bclist")
+
+
+def test_namespace_2_cpp(set_up_test_data):
+    check_function_calls_from("test-namespace-2.bclist")
+
+
+def test_namespace_3_cpp(set_up_test_data):
+    check_function_calls_from("test-namespace-3.bclist")
 
 
 ################################################################################

@@ -12,6 +12,7 @@
 #include "Common.h"
 
 enum AnalysisType { mlta_pref, mlta_only, ta_only };
+enum Demangle { demangle_debug_only, demangle_all, demangle_none };
 
 //
 // typedefs
@@ -42,6 +43,8 @@ struct GlobalContext {
   ModuleList Modules;
 
   AnalysisType analysisType = mlta_pref;
+  Demangle demangle = demangle_debug_only;
+
   ofstream csvout;
 };
 
