@@ -403,17 +403,13 @@ bool CallGraphPass::typeConfineInCast(CastInst *CastI) {
   if (!FromTy->isPointerTy() || !ToTy->isPointerTy())
     return false;
 
-  Type *EToTy = getPointerType(ToTy);
-  Type *EFromTy = getPointerType(FromTy);
-
+  Type *EToTy = dyn_cast<PointerType>(ToTy)->getElementType();
+  Type *EFromTy = dyn_cast<PointerType>(FromTy)->getElementType();
   if (isCompositeType(EToTy) && isCompositeType(EFromTy)) {
     LOG("Adding to typeTransitTypeMap: ");
     LOG_OBJ("EToType: ", EToTy);
     LOG_OBJ("EFromType: ", EFromTy);
     typeTransitTypeMap[typeHash(EFromTy)].insert(EToTy);
-  }
-
-  if (isCompositeType(EToTy) && isCompositeType(EFromTy)) {
     transitType(EToTy, EFromTy);
     return true;
   }
