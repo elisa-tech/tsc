@@ -41,7 +41,7 @@ struct CallGraphDebugInfo {
   string callee_inlined_from_line = "";
 };
 
-CallGraphDebugInfo readDebugInfo(CallInst *caller_cinst,
+CallGraphDebugInfo readDebugInfo(CallBase *caller_cinst,
                                  string caller_filename) {
 
   struct CallGraphDebugInfo info;
@@ -87,7 +87,7 @@ void CallGraphPass::printCallGraphHeader() {
               << "\n";
 }
 
-void CallGraphPass::printCallGraphRow(CallInst *caller_cinst,
+void CallGraphPass::printCallGraphRow(CallBase *caller_cinst,
                                       Function *callee_func, string callee_type,
                                       string indirect_found_with) {
 
@@ -157,9 +157,9 @@ CallGraphPass::CallGraphPass(GlobalContext *Ctx_)
 // the number and type of parameters of a function matches with the
 // ones of the callsite, we say the function is a possible target of
 // this call.
-void CallGraphPass::findCalleesWithType(CallInst *CI, FuncSet &S) {
+void CallGraphPass::findCalleesWithType(CallBase *CI, FuncSet &S) {
 
-  LOG_OBJ("CallInst: ", CI);
+  LOG_OBJ("CallBase: ", CI);
   if (CI->isInlineAsm())
     return;
 
@@ -538,9 +538,9 @@ Type *CallGraphPass::nextLayerBaseType(Value *V, int &Idx,
   }
 }
 
-bool CallGraphPass::findCalleesWithMLTA(CallInst *CI, FuncSet &FS) {
+bool CallGraphPass::findCalleesWithMLTA(CallBase *CI, FuncSet &FS) {
 
-  LOG_OBJ("CallInst: ", CI);
+  LOG_OBJ("CallBase: ", CI);
 
   // Initial set: first-layer results
   FuncSet FS1 = Ctx->sigFuncsMap[callHash(CI)];
@@ -903,8 +903,8 @@ bool CallGraphPass::doModulePass(Module *M) {
     // Collect callers and callees
     for (inst_iterator i = inst_begin(F), e = inst_end(F); i != e; ++i) {
       // Map callsite to possible callees.
-      if (CallInst *CI = dyn_cast<CallInst>(&*i)) {
-        LOG_OBJ("CallInst: ", CI);
+      if (CallBase *CI = dyn_cast<CallBase>(&*i)) {
+        LOG_OBJ("CallBase: ", CI);
         if (IntrinsicInst *II = dyn_cast<IntrinsicInst>(CI)) {
           LOG("LLVM internal instruction");
           Value *Dst = NULL;

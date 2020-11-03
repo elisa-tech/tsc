@@ -37,7 +37,7 @@ using namespace std;
 
 size_t funcHash(Function *F, bool withName = true, regex *re = NULL,
                 string *with = NULL);
-size_t callHash(CallInst *CI);
+size_t callHash(CallBase *CI);
 size_t typeHash(Type *Ty);
 size_t typeIdxHash(Type *Ty, int Idx = -1);
 size_t hashIdxHash(size_t Hs, int Idx = -1);

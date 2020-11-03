@@ -27,7 +27,7 @@ private:
   static set<size_t> typeEscapeSet;
 
   // Use type-based analysis to find targets of indirect calls
-  void findCalleesWithType(llvm::CallInst *, FuncSet &);
+  void findCalleesWithType(llvm::CallBase *, FuncSet &);
 
   bool isCompositeType(Type *Ty);
   bool typeConfineInInitializer(User *Ini);
@@ -42,9 +42,9 @@ private:
   Type *nextLayerBaseType(Value *V, int &Idx, IndexVector *NextIndex = NULL);
 
   void funcSetIntersection(FuncSet &FS1, FuncSet &FS2, FuncSet &FS);
-  bool findCalleesWithMLTA(CallInst *CI, FuncSet &FS);
+  bool findCalleesWithMLTA(CallBase *CI, FuncSet &FS);
   void printCallGraphHeader();
-  void printCallGraphRow(CallInst *, Function *, string, string);
+  void printCallGraphRow(CallBase *, Function *, string, string);
 
 public:
   CallGraphPass(GlobalContext *Ctx_);

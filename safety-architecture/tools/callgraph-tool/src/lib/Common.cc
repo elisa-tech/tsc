@@ -52,7 +52,7 @@ size_t funcHash(Function *F, bool withName, regex *replace, string *subst) {
   return str_hash(output);
 }
 
-size_t callHash(CallInst *CI) {
+size_t callHash(CallBase *CI) {
 
   CallSite CS(CI);
   Function *CF = CI->getCalledFunction();
