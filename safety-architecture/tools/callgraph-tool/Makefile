@@ -3,15 +3,19 @@
 # SPDX-License-Identifier: Apache-2.0
 
 SHELL := /bin/bash
-LLVM_VERSION := 10.0.0
-ifeq ($(LLVM_VERSION), 10.0.0)
+
+ifeq ($(LLVM_DIR),)
+# If LLVM_DIR was not specified outside this makefile (e.g. via 
+# command line argument) use the following defaults:
+	LLVM_VERSION := 10.0.0
 	LLVM_DIR := /usr/lib/llvm-10
 	LLVM_FIX := sudo apt install clang-10 llvm-10 llvm-10-dev
 else
-	LLVM_DIR := ${CURDIR}/clang/bin
-	LLVM_FIX := ${CURDIR}/scripts/clang_download.py
+	LLVM_FIX := ./scripts/clang_download.py
 endif
-$(info Using LLVM '${LLVM_DIR}')
+
+$(info Using LLVM_DIR: '${LLVM_DIR}')
+$(info Using LLVM_VERSION: '${LLVM_VERSION}')
 
 CRIXCG_SRC_DIR := ${CURDIR}/src
 CRIXCG_BUILD_DIR := ${CURDIR}/build
