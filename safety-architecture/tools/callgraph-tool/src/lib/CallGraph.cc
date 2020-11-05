@@ -60,10 +60,10 @@ CallGraphDebugInfo readDebugInfo(CallBase *caller_cinst,
   for (DILocation *inlined_at = debugInfo->getInlinedAt(); inlined_at;
        inlined_at = inlined_at->getInlinedAt()) {
     DILocalScope *scope = inlined_at->getScope();
-    string filename = scope->getFilename();
+    string filename = scope->getFilename().str();
     if (filename == caller_filename) {
       info.caller_line = to_string(inlined_at->getLine());
-      info.callee_inlined_from_file = debugInfo->getFilename();
+      info.callee_inlined_from_file = debugInfo->getFilename().str();
       info.callee_inlined_from_line = to_string(debugInfo->getLine());
       break;
     }
@@ -96,7 +96,7 @@ void CallGraphPass::printCallGraphRow(CallBase *caller_cinst,
   string callee_filename = "";
 
   if (callee_func) {
-    callee_name = callee_func->getName();
+    callee_name = callee_func->getName().str();
     DISubprogram *callee_sp = callee_func->getSubprogram();
     if (callee_sp) {
       callee_line = to_string(callee_sp->getLine());
@@ -115,7 +115,7 @@ void CallGraphPass::printCallGraphRow(CallBase *caller_cinst,
 
   Function *caller_func = caller_cinst->getCaller();
   if (caller_func) {
-    caller_name = caller_func->getName();
+    caller_name = caller_func->getName().str();
     DISubprogram *caller_sp = caller_func->getSubprogram();
     if (caller_sp) {
       caller_line_funcdef = to_string(caller_sp->getLine());
@@ -157,16 +157,15 @@ CallGraphPass::CallGraphPass(GlobalContext *Ctx_)
 // the number and type of parameters of a function matches with the
 // ones of the callsite, we say the function is a possible target of
 // this call.
-void CallGraphPass::findCalleesWithType(CallBase *CI, FuncSet &S) {
+void CallGraphPass::findCalleesWithType(CallBase *CS, FuncSet &S) {
 
-  LOG_OBJ("CallBase: ", CI);
-  if (CI->isInlineAsm())
+  LOG_OBJ("CallBase: ", CS);
+  if (CS->isInlineAsm())
     return;
 
   //
   // TODO: performance improvement: cache results for types
   //
-  CallSite CS(CI);
   for (Function *F : Ctx->AddressTakenFuncs) {
 
     // VarArg
@@ -174,7 +173,7 @@ void CallGraphPass::findCalleesWithType(CallBase *CI, FuncSet &S) {
       // Compare only known args in VarArg.
     }
     // otherwise, the numbers of args should be equal.
-    else if (F->arg_size() != CS.arg_size()) {
+    else if (F->arg_size() != CS->arg_size()) {
       continue;
     }
 
@@ -199,7 +198,7 @@ void CallGraphPass::findCalleesWithType(CallBase *CI, FuncSet &S) {
 
     // Type matching on args.
     bool Matched = true;
-    CallSite::arg_iterator AI = CS.arg_begin();
+    auto AI = CS->arg_begin();
     for (Function::arg_iterator FI = F->arg_begin(), FE = F->arg_end();
          FI != FE; ++FI, ++AI) {
       // Check type mis-matches.
@@ -558,7 +557,7 @@ bool CallGraphPass::findCalleesWithMLTA(CallBase *CI, FuncSet &FS) {
   FuncSet FS2, FST;
 
   int FieldIdx = -1;
-  Value *CV = CI->getCalledValue();
+  Value *CV = CI->getCalledOperand();
   IndexVector NextLayer;
   int LayerNo = 1;
   int FirstIdx = -1;
@@ -792,7 +791,7 @@ bool CallGraphPass::doInitialization(Module *M) {
       // External linkage always ends up with the function name.
       StringRef FName = F.getName();
       // Map functions to their names.
-      Ctx->GlobalFuncs[FName] = &F;
+      Ctx->GlobalFuncs[FName.str()] = &F;
     }
 
     LOG("checking UnifiedFuncMap");
@@ -926,16 +925,15 @@ bool CallGraphPass::doModulePass(Module *M) {
           continue;
         }
 
-        CallSite CS(CI);
         FuncSet FS;
         Function *CF = CI->getCalledFunction();
-        Value *CV = CI->getCalledValue();
+        Value *CV = CI->getCalledOperand();
         if (!CF) {
           CF = dyn_cast<Function>(CV->stripPointerCasts());
         }
         string indirectFoundWith = "";
         // Indirect call
-        if (CS.isIndirectCall()) {
+        if (CI->isIndirectCall()) {
           LOG("Inidirect call");
           if (Ctx->analysisType == ta_only) {
             findCalleesWithType(CI, FS);
@@ -968,7 +966,7 @@ bool CallGraphPass::doModulePass(Module *M) {
             if (CF->empty()) {
               LOG("Extrenal function call");
               StringRef FName = CF->getName();
-              if (Function *GF = Ctx->GlobalFuncs[FName])
+              if (Function *GF = Ctx->GlobalFuncs[FName.str()])
                 CF = GF;
             }
             LOG_FMT("Called function: %s\n", CF->getName().str().c_str());

@@ -52,10 +52,9 @@ size_t funcHash(Function *F, bool withName, regex *replace, string *subst) {
   return str_hash(output);
 }
 
-size_t callHash(CallBase *CI) {
+size_t callHash(CallBase *CS) {
 
-  CallSite CS(CI);
-  Function *CF = CI->getCalledFunction();
+  Function *CF = CS->getCalledFunction();
 
   if (CF)
     return funcHash(CF);
@@ -63,7 +62,7 @@ size_t callHash(CallBase *CI) {
     hash<string> str_hash;
     string sig;
     raw_string_ostream rso(sig);
-    Type *FTy = CS.getFunctionType();
+    Type *FTy = CS->getFunctionType();
     FTy->print(rso);
 
     string strip_str = rso.str();

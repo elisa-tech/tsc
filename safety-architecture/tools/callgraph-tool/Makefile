@@ -3,7 +3,16 @@
 # SPDX-License-Identifier: Apache-2.0
 
 SHELL := /bin/bash
-LLVM_DIR := /usr/lib/llvm-10
+LLVM_VERSION := 10.0.0
+ifeq ($(LLVM_VERSION), 10.0.0)
+	LLVM_DIR := /usr/lib/llvm-10
+	LLVM_FIX := sudo apt install clang-10 llvm-10 llvm-10-dev
+else
+	LLVM_DIR := ${CURDIR}/clang/bin
+	LLVM_FIX := ${CURDIR}/scripts/clang_download.py
+endif
+$(info Using LLVM '${LLVM_DIR}')
+
 CRIXCG_SRC_DIR := ${CURDIR}/src
 CRIXCG_BUILD_DIR := ${CURDIR}/build
 PATH := $(LLVM_DIR)/bin:$(PATH)
@@ -27,7 +36,8 @@ build_analyzer_func = \
 			cmake ${1}	\
 				-DCMAKE_BUILD_TYPE=Release \
 				-DLLVM_ENABLE_ASSERTIONS=ON \
-				-DCMAKE_CXX_FLAGS_RELEASE="-std=c++14 -fno-rtti -fpic -g -Wall" && make -j${NPROC})
+				-DCMAKE_CXX_FLAGS_RELEASE="-std=c++14 -fno-rtti -fpic -g -Wall" \
+				-DLLVM_MIN_VERSION=${LLVM_VERSION} && make -j${NPROC})
 
 GREEN := \033[32m
 RED := \033[31m
@@ -46,16 +56,15 @@ TARGET: ## DESCRIPTION
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?##.*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[32m%-30s\033[0m %s\n", $$1, $$2}'
 
-LLVM_FIX := sudo apt install clang-10 llvm-10 llvm-10-dev
 llvm-check: ## Check LLVM is available
 	@if [ ! -d ${LLVM_DIR} ]; then \
 		printf "${RED}Error: '${LLVM_DIR}' does not exist${NC}\n"; \
-		printf "${YELLOW}Install llvm-10 (${LLVM_FIX}) and try again${NC}\n"; \
+		printf "${YELLOW}Get LLVM (${LLVM_FIX}) and try again${NC}\n"; \
 		false; \
 	fi
 	@if [ ! -d ${LLVM_DIR}/lib/cmake/llvm ]; then \
 		printf "${RED}Error: '${LLVM_DIR}/lib/cmake/llvm' does not exist${NC}\n"; \
-		printf "${YELLOW}Install llvm-10 (${LLVM_FIX}) and try again${NC}\n"; \
+		printf "${YELLOW}Get LLVM (${LLVM_FIX}) and try again${NC}\n"; \
 		false; \
 	fi
 

@@ -5,7 +5,7 @@
 cmake_minimum_required(VERSION 3.5.1)
 project(CALLGRAPH)
 
-set(LLVM_MIN_VERSION "10.0.0")
+message(STATUS "LLVM_MIN_VERSION=${LLVM_MIN_VERSION}")
 find_package(LLVM ${LLVM_MIN_VERSION} REQUIRED)
 
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
