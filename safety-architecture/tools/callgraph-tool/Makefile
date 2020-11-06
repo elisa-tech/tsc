@@ -14,6 +14,10 @@ else
 	LLVM_FIX := ./scripts/clang_download.py
 endif
 
+ifndef LLVM_VERSION
+$(error LLVM_VERSION must be specified if using non-default LLVM_DIR)
+endif
+
 $(info Using LLVM_DIR: '${LLVM_DIR}')
 $(info Using LLVM_VERSION: '${LLVM_VERSION}')
 

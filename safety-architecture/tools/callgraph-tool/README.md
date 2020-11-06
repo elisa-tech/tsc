@@ -59,8 +59,8 @@ git checkout v5.9  # we'll use v5.9 as an example
 
 # We assume $KERNEL contains the path to the target kernel tree root
 KERNEL=$(pwd)
-
 ```
+__Notice__: Linux kernel releases after v5.9 no longer compile with clang 10.0.0. If you encounter this problem you may want to [use crix-callgraph with custom LLVM version](./doc/using_custom_llvm.md).
 
 ## Generating callgraph database
 To make use of the tool, you first need to generate callgraph database relevant for your kernel source tree and build configuration.
