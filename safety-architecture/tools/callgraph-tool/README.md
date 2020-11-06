@@ -110,7 +110,7 @@ make olddefconfig CC=wllvm
 make CC=wllvm HOSTCC=wllvm -j$(nproc)
 
 # List all generated bitcode files
-find ~+ -type f -name ".*.bc" > bitcodefiles.txt
+find ~+ -type f -name "*.bc" -and ! -name "timeconst.bc" > bitcodefiles.txt
 ```
 
 #### Run the crix-callgraph tool
