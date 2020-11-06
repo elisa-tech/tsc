@@ -10,6 +10,7 @@ import sys
 import re
 import wget
 import platform
+import distro
 from pathlib import Path
 import shutil
 import tarfile
@@ -18,7 +19,7 @@ import logging
 ################################################################################
 
 LLVM_URL = 'https://github.com/llvm/llvm-project/releases/download'
-RELEASE = '10.0.0'
+RELEASE = '11.0.0'
 
 ################################################################################
 
@@ -29,15 +30,24 @@ def get_source_url():
 
 def get_clang_url():
     plat = platform.platform()
-    if 'Ubuntu-18.04' in plat and 'x86_64' in plat:
+    if 'x86_64' in platform.platform() and \
+            distro.id() == 'ubuntu' and distro.version() == '20.04':
         url = "%s/llvmorg-%s/" \
-            "clang+llvm-%s-x86_64-linux-gnu-ubuntu-18.04.tar.xz" \
+            "clang+llvm-%s-x86_64-linux-gnu-ubuntu-20.04.tar.xz" \
             "" % (LLVM_URL, RELEASE, RELEASE)
         return url
-    # else if
+    elif 'x86_64' in platform.platform() and \
+            distro.id() == 'ubuntu' and \
+            (distro.version() == '18.04' or distro.version() == '16.04'):
+        url = "%s/llvmorg-%s/" \
+            "clang+llvm-%s-x86_64-linux-gnu-ubuntu-16.04.tar.xz" \
+            "" % (LLVM_URL, RELEASE, RELEASE)
+        return url
+    # elif
     #     ...
     else:
         sys.stderr.write("Error: unknown platfrom \"%s\"\n" % plat)
+        print("%s" % platform.system())
         sys.exit(1)
 
 
