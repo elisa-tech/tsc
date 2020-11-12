@@ -547,21 +547,35 @@ Type *CallGraphPass::nextLayerBaseType(Value *V, int &Idx,
   }
 }
 
+void CallGraphPass::getVirtualFunctionCandidates(CallBase *CI, FuncSet &FS) {
+  FuncSet VFS = virtualCallTargets.getVirtualCallCandidates(CI);
+  for (Function *F : VFS) {
+    LOG_FMT("Virtual call target: %s\n", F->getName().str().c_str());
+    // Get the function definition from UnifiedFuncMap based on the funcHash
+    // in case VFS would not reference the unified function
+    size_t fh = funcHash(F);
+    if (Ctx->UnifiedFuncMap.find(fh) != Ctx->UnifiedFuncMap.end()) {
+      Function *UF = Ctx->UnifiedFuncMap[fh];
+      FS.insert(UF);
+    } else {
+      // If we end up here it means the doInitialization() didn't
+      // iterate function F when the module pass initialization
+      // took place. This should not happen.
+      assert(0 && "Virtual function definition location not found");
+    }
+  }
+}
+
 bool CallGraphPass::findCalleesWithMLTA(CallBase *CI, FuncSet &FS) {
 
   LOG_OBJ("CallBase: ", CI);
 
-  FuncSet VFS = virtualCallTargets.getVirtualCallCandidates(CI);
-  if (DEBUG) {
-    for (Function *F : VFS) {
-      LOG_FMT("Virtual call target: %s\n", F->getName().str().c_str());
-    }
-  }
-
   // Initial set: first-layer results
   FuncSet FS1 = Ctx->sigFuncsMap[callHash(CI)];
-  // Set union: FS1 = FS1 + VFS
-  FS1.insert(VFS.begin(), VFS.end());
+
+  // Append possible virtual function targets
+  getVirtualFunctionCandidates(CI, FS1);
+
   if (FS1.size() == 0) {
     // No need to go through MLTA if the first layer is empty
     LOG("Not in sigFuncsMap: MLTA failed");

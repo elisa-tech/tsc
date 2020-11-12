@@ -172,7 +172,7 @@ int main(int argc, char **argv) {
     GlobalCtx.Modules.push_back(make_pair(Module, MName));
   }
 
-  // Build global callgraph.
+  // Build global callgraph
   CallGraphPass CGPass(&GlobalCtx);
   CGPass.run(GlobalCtx.Modules);
   OP << "[Wrote: " << optOutFilename << "]\n";

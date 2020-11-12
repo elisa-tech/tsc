@@ -219,4 +219,8 @@ def test_namespace_3_cpp(set_up_test_data):
     check_function_calls_from("test-namespace-3.bclist")
 
 
+def test_modules_cpp(set_up_test_data):
+    check_function_calls_from("test-modules.bclist")
+
+
 ################################################################################

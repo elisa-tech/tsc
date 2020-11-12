@@ -23,6 +23,7 @@ make progs-cxx
 make cg-test-template
 make test-opt
 make test-same-funcname
+make test-modules
 
 popd >/dev/null
 

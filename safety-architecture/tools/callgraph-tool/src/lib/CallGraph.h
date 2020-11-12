@@ -43,6 +43,7 @@ private:
   bool findCalleesWithMLTA(CallBase *CI, FuncSet &FS);
   void printCallGraphHeader();
   void printCallGraphRow(CallBase *, Function *, string, string);
+  void getVirtualFunctionCandidates(CallBase *CI, FuncSet &FS);
 
 public:
   CallGraphPass(GlobalContext *Ctx_);
