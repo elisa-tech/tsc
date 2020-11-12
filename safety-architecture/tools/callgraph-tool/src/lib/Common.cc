@@ -13,7 +13,7 @@ static string fixHash(string hash) {
   return regex_replace(hash, reg, "void()");
 }
 
-size_t funcHash(Function *F, bool withName, regex *replace, string *subst) {
+size_t funcHash(Function *F, bool withName) {
 
   hash<string> str_hash;
   string output;
@@ -38,11 +38,6 @@ size_t funcHash(Function *F, bool withName, regex *replace, string *subst) {
       }
     }
 #endif
-  }
-  if (replace && subst) {
-    LOG_FMT("Before replace: %s\n", output.c_str());
-    output = regex_replace(output, *replace, *subst);
-    LOG_FMT("After replace: %s\n", output.c_str());
   }
   string::iterator end_pos = remove(output.begin(), output.end(), ' ');
   output.erase(end_pos, output.end());

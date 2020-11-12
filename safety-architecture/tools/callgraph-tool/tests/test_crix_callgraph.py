@@ -199,9 +199,8 @@ def test_inheritance_multiple_1_cpp(set_up_test_data):
     check_function_calls_from("test-inheritance-multiple-1.bclist")
 
 
-# Below test case does not work correctly at the moment:
-# def test_inheritance_multiple_2_cpp(set_up_test_data):
-#     check_function_calls_from("test-inheritance-multiple-2.bclist")
+def test_inheritance_multiple_2_cpp(set_up_test_data):
+    check_function_calls_from("test-inheritance-multiple-2.bclist")
 
 
 def test_inheritance_multiple_3_cpp(set_up_test_data):

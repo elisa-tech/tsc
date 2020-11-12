@@ -6,6 +6,7 @@
 #define CALL_GRAPH_H
 
 #include "Analyzer.h"
+#include "VirtualCallTargets.h"
 
 typedef llvm::SmallVector<llvm::Value *, 8> IndexVector;
 
@@ -21,10 +22,9 @@ private:
   static DenseMap<size_t, FuncSet> typeFuncsMap;
   static unordered_map<size_t, set<size_t>> typeConfineMap;
   static unordered_map<size_t, set<size_t>> typeTransitMap;
-  static unordered_map<size_t, set<Type *>> typeTransitTypeMap;
-  static unordered_map<std::string, set<Type *>> structTypeMap;
 
   static set<size_t> typeEscapeSet;
+  virtcall::VirtualCallTargetsResult virtualCallTargets;
 
   // Use type-based analysis to find targets of indirect calls
   void findCalleesWithType(llvm::CallBase *, FuncSet &);
@@ -33,9 +33,7 @@ private:
   bool typeConfineInInitializer(User *Ini);
   bool typeConfineInStore(Value *, Value *);
   bool typeConfineInCast(CastInst *CastI);
-  void typeConfineInGlobalVarInit(Constant *Ini);
   void addAddressTakenFunction(Function *F);
-  void addStructTypeCallSignature(StructType *ST, Function *F);
   void escapeType(Type *Ty, int Idx = -1);
   void transitType(Type *ToTy, Type *FromTy, int ToIdx = -1, int FromIdx = -1);
 

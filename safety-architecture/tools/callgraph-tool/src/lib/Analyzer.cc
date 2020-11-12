@@ -51,6 +51,11 @@ cl::opt<Demangle> optDemangle(
                clEnumVal(demangle_none, "Don't demangle function names")),
     cl::cat(CallgraphCategory));
 
+cl::opt<bool>
+    optNoCpp("nocpp",
+             cl::desc("Don't resolve C++ virtual functions (default=false)"),
+             cl::cat(CallgraphCategory));
+
 GlobalContext GlobalCtx;
 
 void IterativeModulePass::run(ModuleList &modules) {
@@ -142,6 +147,7 @@ int main(int argc, char **argv) {
   GlobalCtx.analysisType = optAnalysisType;
   GlobalCtx.demangle = optDemangle;
   GlobalCtx.csvout.open(optOutFilename);
+  GlobalCtx.nocpp = optNoCpp;
   SMDiagnostic Err;
 
   // Loading modules

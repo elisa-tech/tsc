@@ -3,7 +3,7 @@ CFLAGS  = -O0 -g
 INC     = -I./
 
 CXX	        = clang++
-CXXFLAGS    = -O0 -g
+CXXFLAGS    = -O0 -g -flto -fwhole-program-vtables -fvisibility=hidden
 
 #  = means expand whenever used
 # := means expand once
@@ -62,6 +62,7 @@ clang-check:
 	@which clang++ >/dev/null
 
 cg-bin:
+	# cd ../../../ && make LLVM_DIR=/home/hrosten/projects/llvm-project-10.0.0/prefix LLVM_VERSION=10.0.0 crix-callgraph
 	cd ../../../ && make crix-callgraph
 
 # Build bitcode files from the targets in PROGS

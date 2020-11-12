@@ -35,8 +35,7 @@ using namespace std;
 // Common functions
 //
 
-size_t funcHash(Function *F, bool withName = true, regex *re = NULL,
-                string *with = NULL);
+size_t funcHash(Function *F, bool withName = true);
 size_t callHash(CallBase *CI);
 size_t typeHash(Type *Ty);
 size_t typeIdxHash(Type *Ty, int Idx = -1);
