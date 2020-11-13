@@ -16,9 +16,12 @@
 #include "llvm/Support/Signals.h"
 
 #include "CallGraph.h"
+#include "Common.h"
+#include "VirtualCallTargets.h"
 
 using namespace llvm;
 using namespace std;
+using namespace virtcall;
 
 // Command line parameters.
 cl::list<string> InputFilenames(cl::Positional, cl::OneOrMore,
@@ -51,10 +54,11 @@ cl::opt<Demangle> optDemangle(
                clEnumVal(demangle_none, "Don't demangle function names")),
     cl::cat(CallgraphCategory));
 
-cl::opt<bool>
-    optNoCpp("nocpp",
-             cl::desc("Don't resolve C++ virtual functions (default=false)"),
-             cl::cat(CallgraphCategory));
+cl::opt<string> optCppLinkedBitcode(
+    "cpp_linked_bitcode",
+    cl::desc(
+        "Specify whole-program bitcode file for C++ virtual call resolution"),
+    cl::value_desc("filename"), cl::init(""), cl::cat(CallgraphCategory));
 
 GlobalContext GlobalCtx;
 
@@ -147,7 +151,6 @@ int main(int argc, char **argv) {
   GlobalCtx.analysisType = optAnalysisType;
   GlobalCtx.demangle = optDemangle;
   GlobalCtx.csvout.open(optOutFilename);
-  GlobalCtx.nocpp = optNoCpp;
   SMDiagnostic Err;
 
   // Loading modules
@@ -175,6 +178,7 @@ int main(int argc, char **argv) {
   // Build global callgraph
   CallGraphPass CGPass(&GlobalCtx);
   CGPass.run(GlobalCtx.Modules);
+  CGPass.resolveVirtualCallTargets(optCppLinkedBitcode);
   OP << "[Wrote: " << optOutFilename << "]\n";
 
   return 0;

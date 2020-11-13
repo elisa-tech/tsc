@@ -88,9 +88,7 @@ $(PROGS_CXX): %: %.cpp clang-check cg-bin
 	$(CXX) $(CXXFLAGS) $(INC) -emit-llvm -S -o $@.ll $<
 # To use LLVM C++ standard library instead, try:
 #	$(CXX) $(CXXFLAGS) -stdlib=libc++ $(INC) -emit-llvm -c -o $@.bc $<
-# .bclist is just a list of .bc files that will be analyzed together
-	echo $@.bc >$@.bclist
-	$(CG_BIN) -o $@.csv @$@.bclist 2>/dev/null
+	$(CG_BIN) -o $@.csv -cpp_linked_bitcode $@.bc $@.bc 2>/dev/null
 
 # Build bitcode files from the separate sub-project under cg-temp/
 # Run CG_BIN to generate the callgraph 
@@ -127,9 +125,12 @@ test-modules: clang-check cg-bin
 	$(CXX) $(CXXFLAGS) $(INC) -emit-llvm -c test-modules.child.cpp -o test-modules.child.bc
 # To test the binary:
 #	$(CXX) $(CXXFLAGS) $(INC) test-modules.base.cpp test-modules.child.cpp -o test-modules-cpp
+	echo $@.bc >$@.bclist
+	echo test-modules.child.bc >>$@.bclist
 	llvm-link test-modules.child.bc $@.bc > $@.linked.bc
-	echo $@.linked.bc >$@.bclist
-	$(CG_BIN) -o $@.csv @$@.bclist 2>/dev/null
+# To emit .ll file from the linked module
+#	llvm-dis $@.linked.bc
+	$(CG_BIN) -o $@.csv -cpp_linked_bitcode $@.linked.bc @$@.bclist 2>/dev/null
 	$(call target_success,$@)
 
 # Generate expected_calls.csv, which

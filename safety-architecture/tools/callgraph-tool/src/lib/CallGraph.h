@@ -24,7 +24,6 @@ private:
   static unordered_map<size_t, set<size_t>> typeTransitMap;
 
   static set<size_t> typeEscapeSet;
-  virtcall::VirtualCallTargetsResult virtualCallTargets;
 
   // Use type-based analysis to find targets of indirect calls
   void findCalleesWithType(llvm::CallBase *, FuncSet &);
@@ -43,7 +42,9 @@ private:
   bool findCalleesWithMLTA(CallBase *CI, FuncSet &FS);
   void printCallGraphHeader();
   void printCallGraphRow(CallBase *, Function *, string, string);
-  void getVirtualFunctionCandidates(CallBase *CI, FuncSet &FS);
+  void getVirtualFunctionCandidates(CallBase *CI,
+                                    virtcall::VirtualCallTargetsResult &VCT,
+                                    FuncSet &FS);
 
 public:
   CallGraphPass(GlobalContext *Ctx_);
@@ -51,6 +52,8 @@ public:
   virtual bool doInitialization(llvm::Module *);
   virtual bool doFinalization(llvm::Module *);
   virtual bool doModulePass(llvm::Module *);
+
+  void resolveVirtualCallTargets(std::string wholeProgramBitcodeFile);
 };
 
 #endif

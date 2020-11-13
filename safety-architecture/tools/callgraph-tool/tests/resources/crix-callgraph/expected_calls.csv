@@ -195,6 +195,7 @@
 "test-modules.child.cpp","do_final","16","18","","_ZStlsISt11char_traitsIcEERSt13basic_ostreamIcT_ES5_PKc","","direct","","",""
 "test-modules.child.cpp","do_init","8","10","","_ZStlsISt11char_traitsIcEERSt13basic_ostreamIcT_ES5_PKc","","direct","","",""
 "test-modules.child.cpp","do_work","12","14","","_ZStlsISt11char_traitsIcEERSt13basic_ostreamIcT_ES5_PKc","","direct","","",""
+"test-modules.child.cpp","main","21","23","test-modules.child.cpp","Child","6","direct","","",""
 "test-modules.child.cpp","main","21","24","test-modules.base.cpp","run","6","direct","","",""
 "test-namespace-1.cpp","base_pure_virtual","11","12","","_ZStlsISt11char_traitsIcEERSt13basic_ostreamIcT_ES5_PKc","","direct","","",""
 "test-namespace-1.cpp","main","20","21","test-namespace-1.cpp","base_pure_virtual","11","indirect","","","MLTA"

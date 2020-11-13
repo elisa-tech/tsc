@@ -42,10 +42,9 @@ struct GlobalContext {
   // Modules.
   ModuleList Modules;
 
+  // Command line arguments
   AnalysisType analysisType = mlta_pref;
   Demangle demangle = demangle_debug_only;
-  bool nocpp = false;
-
   ofstream csvout;
 };
 

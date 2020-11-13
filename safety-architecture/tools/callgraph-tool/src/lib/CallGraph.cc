@@ -16,6 +16,8 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/TypeFinder.h"
+#include "llvm/IRReader/IRReader.h"
+#include "llvm/Support/SourceMgr.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
 #include "CallGraph.h"
@@ -547,34 +549,12 @@ Type *CallGraphPass::nextLayerBaseType(Value *V, int &Idx,
   }
 }
 
-void CallGraphPass::getVirtualFunctionCandidates(CallBase *CI, FuncSet &FS) {
-  FuncSet VFS = virtualCallTargets.getVirtualCallCandidates(CI);
-  for (Function *F : VFS) {
-    LOG_FMT("Virtual call target: %s\n", F->getName().str().c_str());
-    // Get the function definition from UnifiedFuncMap based on the funcHash
-    // in case VFS would not reference the unified function
-    size_t fh = funcHash(F);
-    if (Ctx->UnifiedFuncMap.find(fh) != Ctx->UnifiedFuncMap.end()) {
-      Function *UF = Ctx->UnifiedFuncMap[fh];
-      FS.insert(UF);
-    } else {
-      // If we end up here it means the doInitialization() didn't
-      // iterate function F when the module pass initialization
-      // took place. This should not happen.
-      assert(0 && "Virtual function definition location not found");
-    }
-  }
-}
-
 bool CallGraphPass::findCalleesWithMLTA(CallBase *CI, FuncSet &FS) {
 
   LOG_OBJ("CallBase: ", CI);
 
   // Initial set: first-layer results
   FuncSet FS1 = Ctx->sigFuncsMap[callHash(CI)];
-
-  // Append possible virtual function targets
-  getVirtualFunctionCandidates(CI, FS1);
 
   if (FS1.size() == 0) {
     // No need to go through MLTA if the first layer is empty
@@ -684,15 +664,6 @@ bool CallGraphPass::doInitialization(Module *M) {
   DL = &(M->getDataLayout());
   Int8PtrTy = Type::getInt8PtrTy(M->getContext());
   IntPtrTy = DL->getIntPtrType(M->getContext());
-
-  if (!Ctx->nocpp) {
-    // Find possible targets of virtual calls
-    VirtualCallResolver::ResolveVirtualCalls(*M, virtualCallTargets);
-    if (DEBUG) {
-      LOG("Resolved virtual call targets:");
-      virtualCallTargets.dump();
-    }
-  }
 
   // Iterate and process globals
   for (Module::global_iterator gi = M->global_begin(); gi != M->global_end();
@@ -861,7 +832,7 @@ bool CallGraphPass::doModulePass(Module *M) {
         Function *CF = CI->getCalledFunction();
         Value *CV = CI->getCalledOperand();
         if (!CF) {
-          CF = dyn_cast<Function>(CV->stripPointerCasts());
+          CF = dyn_cast<Function>(CV->stripPointerCastsAndAliases());
         }
         string indirectFoundWith = "";
         // Indirect call
@@ -896,7 +867,7 @@ bool CallGraphPass::doModulePass(Module *M) {
           if (CF) {
             // Call external functions
             if (CF->empty()) {
-              LOG("Extrenal function call");
+              LOG("External function call");
               StringRef FName = CF->getName();
               if (Function *GF = Ctx->GlobalFuncs[FName.str()])
                 CF = GF;
@@ -920,4 +891,63 @@ bool CallGraphPass::doModulePass(Module *M) {
     }
   }
   return false;
+}
+
+void CallGraphPass::getVirtualFunctionCandidates(CallBase *CI,
+                                                 VirtualCallTargetsResult &VCT,
+                                                 FuncSet &FS) {
+  LOG("Getting virtual function candidates");
+  FuncSet VFS = VCT.getVirtualCallCandidates(CI);
+  for (Function *F : VFS) {
+    LOG_FMT("Virtual call target: %s\n", F->getName().str().c_str());
+    // Get the function definition from UnifiedFuncMap based on the funcHash
+    // in case VFS would not reference the unified function
+    size_t fh = funcHash(F);
+    if (Ctx->UnifiedFuncMap.find(fh) != Ctx->UnifiedFuncMap.end()) {
+      Function *UF = Ctx->UnifiedFuncMap[fh];
+      FS.insert(UF);
+    } else {
+      // If we end up here it means the doInitialization() didn't
+      // iterate function F when the module pass initialization
+      // took place. This is an error we want to take note of.
+      LOG_FMT("Function name: %s\n", F->getName().str().c_str());
+      assert(0 && "Virtual function definition not found");
+    }
+  }
+}
+
+void CallGraphPass::resolveVirtualCallTargets(string wholeProgramBitcodeFile) {
+  //
+  // Find possible targets of virtual calls: this is run over a single merged
+  // module that contains all vtables with !type metadata.
+  //
+  if (wholeProgramBitcodeFile.empty()) {
+    return;
+  }
+
+  SMDiagnostic Err;
+  LLVMContext LLVMCtx;
+  VirtualCallTargetsResult virtualCallTargets;
+
+  unique_ptr<Module> M = parseIRFile(wholeProgramBitcodeFile, Err, LLVMCtx);
+  VirtualCallResolver::ResolveVirtualCalls(*M, virtualCallTargets);
+  if (DEBUG) {
+    LOG("Resolved virtual call targets:");
+    virtualCallTargets.dump();
+  }
+
+  for (Module::iterator f = M->begin(), fe = M->end(); f != fe; ++f) {
+    Function *F = &*f;
+    for (inst_iterator i = inst_begin(F), e = inst_end(F); i != e; ++i) {
+      if (CallBase *CI = dyn_cast<CallBase>(&*i)) {
+        if (CI->isIndirectCall()) {
+          FuncSet FS;
+          getVirtualFunctionCandidates(CI, virtualCallTargets, FS);
+          for (Function *Callee : FS) {
+            printCallGraphRow(CI, Callee, "indirect", "MLTA");
+          }
+        }
+      }
+    }
+  }
 }

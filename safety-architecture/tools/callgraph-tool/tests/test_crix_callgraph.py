@@ -62,23 +62,32 @@ def df_regex_filter(df, col, regex):
     return df[df[col].str.contains(regex, regex=True, na=False)]
 
 
-def check_function_calls_from(target_bclist_file_name):
-    target_bclist_file = TEST_RESOURCES_DIR / target_bclist_file_name
-    assert Path(target_bclist_file).exists()
+def check_function_calls_from(target_bc_file_name, cpp=False):
+    target_bc_file = TEST_RESOURCES_DIR / target_bc_file_name
+    assert Path(target_bc_file).exists()
 
-    # Generate calls.csv file from target_bclist_file
     outfile = TEST_DATA_DIR / "calls.csv"
-    cmd = [CG_BIN,
-           "-o", outfile,
-           "@%s" % target_bclist_file,
-           ]
+    if target_bc_file_name.endswith(".bclist"):
+        target_bc_file = "@%s" % target_bc_file
+
+    if cpp:
+        cmd = [CG_BIN,
+               "-cpp_linked_bitcode", target_bc_file,
+               "-o", outfile,
+               target_bc_file,
+               ]
+    else:
+        cmd = [CG_BIN,
+               "-o", outfile,
+               target_bc_file,
+               ]
     assert subprocess.run(cmd).returncode == 0
     assert Path(outfile).exists()
 
     # Check the generated contents matches expected
     assert EXPECTED.exists()
     df_expected = pd.read_csv(EXPECTED)
-    caller_regex = "^%s" % os.path.splitext(target_bclist_file_name)[0]
+    caller_regex = "^%s" % target_bc_file_name.split(".")[0]
     df_expected = df_regex_filter(df_expected, "caller_filename", caller_regex)
     df_generated = pd.read_csv(outfile)
     # Remove entries where caller or callee function name begins with '__cxx'.
@@ -180,47 +189,47 @@ def test_union(set_up_test_data):
 
 
 def test_hello_cpp(set_up_test_data):
-    check_function_calls_from("test-hello.bclist")
+    check_function_calls_from("test-hello.bc", cpp=True)
 
 
 def test_inheritance_basic_cpp(set_up_test_data):
-    check_function_calls_from("test-inheritance-basic.bclist")
+    check_function_calls_from("test-inheritance-basic.bc", cpp=True)
 
 
 def test_inheritance_global_cpp(set_up_test_data):
-    check_function_calls_from("test-inheritance-global.bclist")
+    check_function_calls_from("test-inheritance-global.bc", cpp=True)
 
 
 def test_inheritance_multilevel_cpp(set_up_test_data):
-    check_function_calls_from("test-inheritance-multilevel.bclist")
+    check_function_calls_from("test-inheritance-multilevel.bc", cpp=True)
 
 
 def test_inheritance_multiple_1_cpp(set_up_test_data):
-    check_function_calls_from("test-inheritance-multiple-1.bclist")
+    check_function_calls_from("test-inheritance-multiple-1.bc", cpp=True)
 
 
 def test_inheritance_multiple_2_cpp(set_up_test_data):
-    check_function_calls_from("test-inheritance-multiple-2.bclist")
+    check_function_calls_from("test-inheritance-multiple-2.bc", cpp=True)
 
 
 def test_inheritance_multiple_3_cpp(set_up_test_data):
-    check_function_calls_from("test-inheritance-multiple-3.bclist")
+    check_function_calls_from("test-inheritance-multiple-3.bc", cpp=True)
 
 
 def test_namespace_1_cpp(set_up_test_data):
-    check_function_calls_from("test-namespace-1.bclist")
+    check_function_calls_from("test-namespace-1.bc", cpp=True)
 
 
 def test_namespace_2_cpp(set_up_test_data):
-    check_function_calls_from("test-namespace-2.bclist")
+    check_function_calls_from("test-namespace-2.bc", cpp=True)
 
 
 def test_namespace_3_cpp(set_up_test_data):
-    check_function_calls_from("test-namespace-3.bclist")
+    check_function_calls_from("test-namespace-3.bc", cpp=True)
 
 
 def test_modules_cpp(set_up_test_data):
-    check_function_calls_from("test-modules.bclist")
+    check_function_calls_from("test-modules.linked.bc", cpp=True)
 
 
 ################################################################################
