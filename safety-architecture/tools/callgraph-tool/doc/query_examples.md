@@ -94,7 +94,7 @@ cd $CG_DIR
 
 ## How to use the callgraph database
 
-Below examples were produced from x86_64_defconfig build, using v5.8.7 stable kernel tree.
+Below examples were produced from x86_64_defconfig build, using v5.9 stable kernel tree.
 
 #### Example: functions called by sock_recvmsg
 To visualize the functions called by `sock_recvmsg` run the following command:
@@ -114,7 +114,7 @@ Output:
 <img src=sock_recvmsg_d1.png>
 <br /><br />
 
-The output graph shows that function `sock_recvmsg` is defined in file net/socket.c on line 900. It calls three functions: `msg_data_left`, `security_socket_recvmsg`, and `sock_recvmsg_nosec`. The calls to these functions takes place from net/socket.c on lines 901, 901, and 903. The three called functions are defined in include/linux/socket.h:158, security/security.c:2127, and net/socket.c:882 respectively. Notice the node labels refer each function's definition, not declaration location.
+The output graph shows that function `sock_recvmsg` is defined in file net/socket.c on line 899. It calls three functions: `msg_data_left`, `security_socket_recvmsg`, and `sock_recvmsg_nosec`. The calls to these functions take place from net/socket.c on lines 901, 901, and 903. The three called functions are defined in include/linux/socket.h:158, security/security.c:2127, and net/socket.c:882 respectively. Notice the node labels refer each function's definition, not declaration location.
 
 Increasing the `--depth` argument makes the query_callgraph.py walk the call chains deeper. For instance, with `--depth 2`, the output becomes:
 

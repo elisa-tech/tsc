@@ -31,6 +31,8 @@ using namespace virtcall;
 //
 ////////////////////////////////////////////////////////////////////////////////
 
+#if __clang_major__ <= 10
+
 namespace llvm {
 void initializeVirtualCallTargetsPass(PassRegistry &);
 void initializeDominatorTreeWrapperPassPass(PassRegistry &);
@@ -277,7 +279,7 @@ VirtualCallTargetsResult VirtualCallTargets::runOnModule(Module &M) {
 
   if ((!TypeTestFunc || TypeTestFunc->use_empty() || !AssumeFunc ||
        AssumeFunc->use_empty())) {
-    LOG("Missing required intrinsics");
+    WARN_FMT("Missing required intrinsic functions%s", "\n");
     return m_results;
   }
 
@@ -339,7 +341,7 @@ void VirtualCallResolver::ResolveVirtualCalls(
   auto MAM = ModuleAnalysisManager();
   MAM.registerPass([&] { return virtcall::VirtualCallTargets(); });
 
-  // Create a module pass manager and add StaticCCWrapper to it.
+  // Create a module pass manager and add VirtualCallWrapper to it.
   ModulePassManager MPM;
   VirtualCallWrapper VirtualWrapper(&result);
   MPM.addPass(VirtualWrapper);
@@ -364,3 +366,5 @@ void VirtualCallResolver::ResolveVirtualCalls(
 AnalysisKey VirtualCallTargets::Key;
 
 ////////////////////////////////////////////////////////////////////////////////
+
+#endif //  __clang_major__ <= 10

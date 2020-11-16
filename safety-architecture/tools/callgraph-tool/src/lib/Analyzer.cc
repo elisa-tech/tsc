@@ -162,12 +162,10 @@ int main(int argc, char **argv) {
     unique_ptr<Module> M = parseIRFile(InputFilenames[i], Err, *LLVMCtx);
 
     if (M == NULL) {
-      OP << yellow << "[Warning]" << reset << " error loading file '"
-         << InputFilenames[i] << "'\n";
+      WARN_FMT("Error loading file: '%s'\n", InputFilenames[i].c_str());
       continue;
     } else if (M->getNamedMetadata("llvm.dbg.cu") == NULL) {
-      OP << yellow << "[Warning]" << reset
-         << " debug info missing: " << M->getName() << "\n";
+      WARN_FMT("Debug info missing: '%s'\n", M->getName().str().c_str());
     }
 
     Module *Module = M.release();
@@ -178,7 +176,15 @@ int main(int argc, char **argv) {
   // Build global callgraph
   CallGraphPass CGPass(&GlobalCtx);
   CGPass.run(GlobalCtx.Modules);
-  CGPass.resolveVirtualCallTargets(optCppLinkedBitcode);
+  if (!optCppLinkedBitcode.empty()) {
+#if __clang_major__ <= 10
+    CGPass.resolveVirtualCallTargets(optCppLinkedBitcode);
+#else
+    WARN_FMT("Resolving virtual call targets is currently not supported on "
+             "llvm-11 or later%s",
+             "\n");
+#endif
+  }
   OP << "[Wrote: " << optOutFilename << "]\n";
 
   return 0;

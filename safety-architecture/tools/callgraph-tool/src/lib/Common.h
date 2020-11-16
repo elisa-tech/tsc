@@ -31,6 +31,13 @@ using namespace std;
       fprintf(DSTREAM, "[%s:%d]: " fmt, __func__, __LINE__, __VA_ARGS__);      \
   } while (0)
 
+#define CLR_NRM "\x1B[0m"
+#define CLR_YEL "\x1B[1;33m"
+#define WARN_FMT(fmt, ...)                                                     \
+  do {                                                                         \
+    fprintf(DSTREAM, "%s[Warning]%s " fmt, CLR_YEL, CLR_NRM, __VA_ARGS__);     \
+  } while (0)
+
 //
 // Common functions
 //

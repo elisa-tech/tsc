@@ -13,6 +13,7 @@ import csv
 from pathlib import Path
 import pandas as pd
 import test_utils
+import re
 
 ################################################################################
 
@@ -48,6 +49,16 @@ def clean_up_session_test_data():
     assert subprocess.run(cmd).returncode == 0
 
 
+def get_clang_version():
+    cmake_output = TESTS_DIR / "../build/CMakeFiles/CMakeOutput.log"
+    with open(cmake_output) as f:
+        for line in f:
+            match = re.search(r"clang\s*version\s*(\d+)\.", line)
+            if match:
+                return match.group(1)
+    return None
+
+
 @pytest.fixture()
 def set_up_test_data():
     print("test setup")
@@ -70,7 +81,10 @@ def check_function_calls_from(target_bc_file_name, cpp=False):
     if target_bc_file_name.endswith(".bclist"):
         target_bc_file = "@%s" % target_bc_file
 
-    if cpp:
+    if cpp and (int(get_clang_version()) >= 11):
+        print("Not supported on llvm-11 currently")
+        return
+    elif cpp:
         cmd = [CG_BIN,
                "-cpp_linked_bitcode", target_bc_file,
                "-o", outfile,

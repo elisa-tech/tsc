@@ -5,7 +5,6 @@
 #ifndef VIRTUAL_CALL_TARGETS_H
 #define VIRTUAL_CALL_TARGETS_H
 
-#include "llvm/IR/CallSite.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Transforms/IPO/WholeProgramDevirt.h"

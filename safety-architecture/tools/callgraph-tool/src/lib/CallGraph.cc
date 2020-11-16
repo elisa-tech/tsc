@@ -893,6 +893,11 @@ bool CallGraphPass::doModulePass(Module *M) {
   return false;
 }
 
+// Resolving virtual call targets currently does not work with
+// llvm-11 or later. 
+// TODO: VirtualCallTargets.cc needs to be modified to support llvm-11.
+#if __clang_major__ <= 10
+
 void CallGraphPass::getVirtualFunctionCandidates(CallBase *CI,
                                                  VirtualCallTargetsResult &VCT,
                                                  FuncSet &FS) {
@@ -917,7 +922,6 @@ void CallGraphPass::getVirtualFunctionCandidates(CallBase *CI,
 }
 
 void CallGraphPass::resolveVirtualCallTargets(string wholeProgramBitcodeFile) {
-  //
   // Find possible targets of virtual calls: this is run over a single merged
   // module that contains all vtables with !type metadata.
   //
@@ -951,3 +955,5 @@ void CallGraphPass::resolveVirtualCallTargets(string wholeProgramBitcodeFile) {
     }
   }
 }
+
+#endif // __clang_major__ <= 10
