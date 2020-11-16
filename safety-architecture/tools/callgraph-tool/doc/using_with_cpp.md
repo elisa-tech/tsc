@@ -203,8 +203,9 @@ Output:
 <img src=test_crixcg_d1.png width=200>
 <br /><br />
 
-It's easy to lose track of relevant call chains in visualizing C++ functions due to the large amount of function calls to C++ libraries that might not be relevant from the main target program view point. For that reason, we use the [q](https://github.com/harelba/q) program to filter out C++ library functions from the callgraph database. To install q, follow the installatin instructions from [github](https://github.com/harelba/q).
+It's easy to lose track of relevant call chains in visualizing C++ functions due to the large amount of function calls to C++ libraries that might not be relevant from the main target program view point. For that reason, we use the [q](https://github.com/harelba/q) program to filter out C++ library functions from the callgraph database. To install q, follow the installation instructions from [github](https://github.com/harelba/q).
 
+To filter the callgraph database, we use the following query:
 ```
 cd $CG_DIR/build/lib
 
@@ -220,7 +221,7 @@ q -w all -W all -H -d, -O  \
     > crix_callgraph_filtered.csv 
 ```
 
-Then, re-run the earlier visualization query using the crix_callgraph_filtered.csv as an input csv:
+Then, re-generate the earlier visualization now using the crix_callgraph_filtered.csv as an input csv:
 ```
 cd $CG_DIR/build/lib
 
