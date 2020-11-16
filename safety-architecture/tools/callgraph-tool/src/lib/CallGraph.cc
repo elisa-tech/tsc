@@ -905,19 +905,7 @@ void CallGraphPass::getVirtualFunctionCandidates(CallBase *CI,
   FuncSet VFS = VCT.getVirtualCallCandidates(CI);
   for (Function *F : VFS) {
     LOG_FMT("Virtual call target: %s\n", F->getName().str().c_str());
-    // Get the function definition from UnifiedFuncMap based on the funcHash
-    // in case VFS would not reference the unified function
-    size_t fh = funcHash(F);
-    if (Ctx->UnifiedFuncMap.find(fh) != Ctx->UnifiedFuncMap.end()) {
-      Function *UF = Ctx->UnifiedFuncMap[fh];
-      FS.insert(UF);
-    } else {
-      // If we end up here it means the doInitialization() didn't
-      // iterate function F when the module pass initialization
-      // took place. This is an error we want to take note of.
-      LOG_FMT("Function name: %s\n", F->getName().str().c_str());
-      assert(0 && "Virtual function definition not found");
-    }
+    FS.insert(F);
   }
 }
 

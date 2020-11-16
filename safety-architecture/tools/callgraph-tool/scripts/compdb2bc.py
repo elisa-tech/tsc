@@ -50,18 +50,21 @@ def set_clang_bindings_and_lib(bindings, libclang):
 
 
 class BitcodeCompiler():
-    def __init__(self, compdb, srcfile=None, append_arg="", clang=""):
+    def __init__(
+            self, compdb, srcfile=None, append_arg="", clang="", keepcwd=False):
         self.compdbpath = os.path.dirname(os.path.abspath(compdb))
         self.append_args = list(append_arg.split(" "))
         self.append_args = [x for x in self.append_args if x]
         self.srcfile = srcfile
         self.clang_bin = clang
+        self.keepcwd = keepcwd
         _LOGGER.debug("Using python bindings: %s" % str(cl))
 
     def generate_bitcode(self):
-        # Paths in compile_commands.json are relative so we need to chdir
         cwd = os.getcwd()
-        os.chdir(self.compdbpath)
+        if (not self.keepcwd):
+            # Paths in compile_commands.json are relative so we need to chdir
+            os.chdir(self.compdbpath)
         self._compile()
         # Change working directory back to where it was
         os.chdir(cwd)
@@ -75,6 +78,7 @@ class BitcodeCompiler():
 
         cpu_count = multiprocessing.cpu_count()
         _LOGGER.debug("Starting compile jobs (processes=%s)" % cpu_count)
+        _LOGGER.debug("Current working dir: %s" % os.getcwd())
 
         with multiprocessing.Pool(processes=cpu_count) as pool:
             results = []
@@ -155,6 +159,14 @@ def command_line_args(scriptdir):
     help = "Set the verbose level (defaults to --v=1)"
     parser.add_argument('--verbose', help=help, type=int, default=1)
 
+    help = "Keep current working directory (default=False). "\
+        "By default, this script changes the working directory to "\
+        "the directory of the COMPDB, since typically the file paths "\
+        "in the compilation database are relative to the directory that "\
+        "contains the COMPDB. To disable this default behaviour and work "\
+        "from the current working directory instead, enable this flag."
+    parser.add_argument('--keepcwd', help=help, action='store_true')
+
     return parser.parse_args()
 
 ################################################################################
@@ -167,6 +179,7 @@ def compdb2bc(args):
         srcfile=args.file,
         append_arg=args.append_arg,
         clang=args.clang,
+        keepcwd=args.keepcwd,
     )
     compiler.generate_bitcode()
 
