@@ -157,9 +157,9 @@ class Grapher():
 
         # Graphviz apparently doesn't like colons in node names
         self.df['caller_function'] = self.df.caller_function.str.replace(
-            ':', '@')
+            ':', ' ')
         self.df['callee_function'] = self.df.callee_function.str.replace(
-            ':', '@')
+            ':', ' ')
 
     def _load_coverage_data(self, filename):
         utils.exit_unless_accessible(filename)
@@ -294,6 +294,12 @@ class Grapher():
     def _path_drawn(self, row):
         if row is None:
             return False
+        if (row.caller_filename == row.callee_filename) and \
+                (row.caller_function == row.callee_function) and \
+                (row.caller_def_line == row.callee_line) and \
+                (row.callee_calltype == "indirect"):
+            # Skip drawing recursive indirect calls
+            return True
         hash_str = "%s:%s:%s:%s:%s:%s" % (
             row.caller_filename,
             row.caller_function,

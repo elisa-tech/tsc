@@ -6,15 +6,15 @@ SPDX-License-Identifier: Apache-2.0
 
 # Callgraph
 
-This repository is a collection of tools for constructing and analyzing callgraphs. The tools have been developed mainly to target Linux Kernel, but they should work with any target C programs that can be compiled with clang. Main highlights include:
+This repository is a collection of tools for constructing and analyzing callgraphs. The tools have been developed mainly to target Linux Kernel, but they should work with any target C/C++ programs that can be compiled with clang. Main highlights include:
 - Constructs a precise global callgraph.
 - Builds on top of LLVM.
 - Input is LLVM assembly (IR): generated callgraph reflects the compilation configurations. For instance, build configuration and compiler optimization levels impact the output callgraph.
 - Resolves indirect call targets based on type-analysis code from the [crix](https://github.com/umnsec/crix) program.
 - Scales well to large programs, does not require excessive resources. Finds direct and indirect function calls from an example Linux x86_64_defconfig kernel build in less than two minutes on a laptop with 8GB RAM and a SSD drive.
-- Allows effectively querying and viewing function call chains from large C programs.
+- Allows effectively querying and viewing function call chains from large C/C++ programs.
 
-See some example uses at: [How to use the callgraph database](./doc/query_examples.md#how-to-use-the-callgraph-database). To get started on using callgraph with your own target C programs, check this [example](./doc/simple_c_example.md).
+See some example uses at: [How to use the callgraph database](./doc/query_examples.md#how-to-use-the-callgraph-database). To get started on using callgraph with your own target C programs, check this [example](./doc/simple_c_example.md). For examples of how to use crix-callgraph with C++ targets, see: [Using callgraph with C++ targets](./doc/using_with_cpp.md).
 
 Table of Contents
 =================
