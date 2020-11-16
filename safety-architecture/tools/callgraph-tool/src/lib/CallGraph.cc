@@ -894,7 +894,7 @@ bool CallGraphPass::doModulePass(Module *M) {
 }
 
 // Resolving virtual call targets currently does not work with
-// llvm-11 or later. 
+// llvm-11 or later.
 // TODO: VirtualCallTargets.cc needs to be modified to support llvm-11.
 #if __clang_major__ <= 10
 
