@@ -16,50 +16,9 @@ import re
 import sys
 import utils
 
-from collections import namedtuple
-from grapher import Grapher
-
 ################################################################################
 
 _LOGGER = logging.getLogger(utils.LOGGER_NAME)
-
-################################################################################
-
-
-SearchSettings = namedtuple(
-    'SearchSettings', [
-        "from_col_func",
-        "from_col_fn",
-        "to_col_func",
-        "to_col_fn",
-        "orientation",
-        "cutoff"
-    ]
-)
-
-
-def search_settings(direction, cutoff):
-    left_search, right_search = None, None
-    if direction == "both" or direction == "left":
-        left_search = SearchSettings(
-            from_col_func="callee_function",
-            from_col_fn="callee_filename",
-            to_col_func="caller_function",
-            to_col_fn="caller_filename",
-            orientation='reverse',
-            cutoff=cutoff
-        )
-    if direction == "both" or direction == "right":
-        right_search = SearchSettings(
-            from_col_func="caller_function",
-            from_col_fn="caller_filename",
-            to_col_func="callee_function",
-            to_col_fn="callee_filename",
-            orientation='original',
-            cutoff=cutoff
-        )
-    return left_search, right_search
-
 
 ################################################################################
 
@@ -118,61 +77,7 @@ def def_regex_filter(df, column, regex):
     return df[df[column].str.contains(regex, regex=True, na=False)]
 
 
-def get_edge_bfs_dir(g, from_node, direction):
-    return nx.edge_bfs(g, source=from_node, orientation=direction.orientation)
-
-
-def find_all_chains(df, from_node, to_nodes, direction):
-    _LOGGER.info("Converting the database into a graph...")
-    G = graph_from_df(df)
-    _LOGGER.info("Generating paths from source function...")
-    g_edges = get_edge_bfs_dir(G, from_node, direction)
-    g_dir = nx.DiGraph()
-    for u, v, orientation in g_edges:
-        if orientation == 'reverse':
-            v, u = u, v
-        g_dir.add_edge(u, v)
-
-    _LOGGER.info("Filtering the paths...")
-    if direction.cutoff:
-        _LOGGER.warning("Using cutoff %s, "
-                        "results might be incomplete" % direction.cutoff)
-
-    rows = []
-    for to_node in to_nodes:
-        # check every dest node for possible paths from source
-        if g_dir.has_node(to_node):
-            # special check for recursive call
-            if from_node == to_node:
-                rows.append([
-                    from_node.filename, from_node.function,
-                    to_node.filename, to_node.function,
-                ])
-                continue
-
-            paths = nx.all_simple_paths(g_dir, from_node, to_node, cutoff=direction.cutoff)
-            for path in paths:
-                chain = list(path)
-                if len(chain) > 2:
-                    chain = zip(chain[:-1], chain[1:])
-                else:
-                    chain = [chain]
-                for link in chain:
-                    out_node, in_node = link[0], link[1]
-                    rows.append([
-                        out_node.filename, out_node.function,
-                        in_node.filename, in_node.function,
-                    ])
-
-    cols = [
-        direction.from_col_fn, direction.from_col_func,
-        direction.to_col_fn, direction.to_col_func
-    ]
-    chains_df = pd.DataFrame(data=rows, columns=cols)
-    return chains_df
-
-
-def get_df_from(df, from_fun, function_col, filename_col):
+def get_df_from(df, from_fun, function_col, filename_col, drop_duplicates=True):
     from_fun = from_fun.split(":")
     if len(from_fun) == 1:
         from_fun = ["", from_fun[0]]
@@ -187,30 +92,15 @@ def get_df_from(df, from_fun, function_col, filename_col):
         )
         sys.exit(1)
     # If multiple from functions with the same name, notify the user to specify a filename too
-    df_from = df_from[[function_col, filename_col]].drop_duplicates()
-    if df_from.shape[0] > 1:
-        _LOGGER.warn(
-            "Multiple functions with the name '%s' exist in call graph database. Please,"
-            " specify the correct function using filepath:filename format" % from_fun[1]
-        )
-        sys.exit(1)
+    if drop_duplicates:
+        df_from = df_from[[function_col, filename_col]].drop_duplicates()
+        if df_from.shape[0] > 1:
+            _LOGGER.warn(
+                "Multiple functions with the name '%s' exist in call graph database. Please,"
+                " specify the correct function using filepath:filename format" % from_fun[1]
+            )
+            sys.exit(1)
     return df_from
-
-
-def get_df_to(df, to_fun, function_col, filename_col):
-
-    # If there are no functions matching regex exit with info message
-    df_to = def_regex_filter(df, column=function_col, regex=to_fun)
-    df_to = df_to[[function_col, filename_col]].drop_duplicates()
-
-    if df_to.shape[0] <= 0:
-        _LOGGER.warn(
-            "Function regex '%s' does not match any entries in call graph database"
-            " for selected search direction" % to_fun
-        )
-        sys.exit(1)
-
-    return df_to
 
 
 def graph_from_df(df):
@@ -225,24 +115,6 @@ def graph_from_df(df):
         g.add_edge(n1, n2)
 
     return g
-
-
-def find_chains_directed_df(df, from_fun, to_fun, dir):
-    df_from = get_df_from(df, from_fun, dir.from_col_func, dir.from_col_fn)
-    df_to = get_df_to(df, to_fun, dir.to_col_func, dir.to_col_fn)
-    from_node = Node(
-        function=df_from[dir.from_col_func].iloc[0],
-        filename=df_from[dir.from_col_fn].iloc[0]
-    )
-    to_nodes = []
-    for _, row in df_to.iterrows():
-        to_nodes.append(
-            Node(
-                function=row[dir.to_col_func], filename=row[dir.to_col_fn]
-            )
-        )
-    chains_df = find_all_chains(df, from_node, to_nodes, dir)
-    return chains_df
 
 
 def find_lca(df, f1, f2):
@@ -352,12 +224,10 @@ if __name__ == "__main__":
             indicator=True)
 
         # insert dummy rows with caller "___" and callee being arg1 and arg2
-        node1 = get_df_from(df1, args.function1, 'caller_function', 'caller_filename')
-        node1 = df1[(df1['caller_function'] == node1['caller_function'].iloc[0]) &
-                    (df1['caller_filename'] == node1['caller_filename'].iloc[0])]
-        node2 = get_df_from(df2, args.function2, 'caller_function', 'caller_filename')
-        node2 = df2[(df2['caller_function'] == node2['caller_function'].iloc[0]) &
-                    (df2['caller_filename'] == node2['caller_filename'].iloc[0])]
+        node1 = get_df_from(
+            df1, args.function1, 'caller_function', 'caller_filename', drop_duplicates=False)
+        node2 = get_df_from(
+            df2, args.function2, 'caller_function', 'caller_filename', drop_duplicates=False)
         n1_function = node1['caller_function'].iloc[0]
         n1_filename = node1['caller_filename'].iloc[0]
         n1_def_line = node1['caller_def_line'].iloc[0]
@@ -366,9 +236,12 @@ if __name__ == "__main__":
         n2_def_line = node2['caller_def_line'].iloc[0]
 
         data = [
-            ['___', "___", "", "0", n1_filename, n1_function, n1_def_line, "", "both"],
-            ['___', "___", "", "0", n2_filename, n2_function, n2_def_line, "", "both"]]
+            ['___', "___", "", "0", n1_filename, n1_function, n1_def_line, ""],
+            ['___', "___", "", "0", n2_filename, n2_function, n2_def_line, ""]]
+        df = def_regex_filter(df, '_merge', 'both')
+        df = df.drop(columns=['_merge'])
         df = df.append(pd.DataFrame(data, columns=df.columns), ignore_index=True)
+        df = pd.concat([df, node1, node2])
         df_to_csv_file(df, args.out)
 
     _LOGGER.info("Done")
