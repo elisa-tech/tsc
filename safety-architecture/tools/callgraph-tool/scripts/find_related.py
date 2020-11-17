@@ -295,6 +295,11 @@ def getargs():
     help = "second input argument"
     required_named.add_argument("--arg2", help=help, required=True)
 
+    help = "source 1 node name (only used for offspring algorithm)"
+    parser.add_argument("--source1", help=help)
+    help = "source 2 node name (only used for offspring algorithm)"
+    parser.add_argument("--source2", help=help)
+
     help = "name of the output file"
     parser.add_argument("--out", help=help, default="related.json")
     choices = ["ancestor", "offspring"]
@@ -345,6 +350,18 @@ if __name__ == "__main__":
             how="outer",
             on=["caller_filename", "caller_function", "callee_filename", "callee_function"],
             indicator=True)
+
+        # insert dummy rows with caller "___" and callee being arg1 and arg2
+        node1 = get_df_from(df1, args.source1, 'caller_function', 'caller_filename')
+        node2 = get_df_from(df2, args.source2, 'caller_function', 'caller_filename')
+        app_df = pd.DataFrame([
+            ['___', "___", "___", "0", node1.filename, node1.function,
+                "", "", "", "", "", "both"],
+            ['___', "___", "___", "0", node2.filename, node2.function,
+                "", "", "", "", "", "both"]],
+            columns=df.columns, ignore_index=True)
+
+        df.append(app_df)
         df_to_csv_file(df, args.out)
 
     _LOGGER.info("Done")
