@@ -289,16 +289,11 @@ def getargs():
 
     required_named = parser.add_argument_group('required named arguments')
     help = "function call database csv file"
-    required_named.add_argument("--calls", help=help, required=True)
+    required_named.add_argument("--calls", help=help, required=True, nargs='+')
     help = "first input argument"
-    required_named.add_argument("--arg1", help=help, required=True)
+    required_named.add_argument("--function1", help=help, required=True)
     help = "second input argument"
-    required_named.add_argument("--arg2", help=help, required=True)
-
-    help = "source 1 node name (only used for offspring algorithm)"
-    parser.add_argument("--source1", help=help)
-    help = "source 2 node name (only used for offspring algorithm)"
-    parser.add_argument("--source2", help=help)
+    required_named.add_argument("--function2", help=help, required=True)
 
     help = "name of the output file"
     parser.add_argument("--out", help=help, default="related.json")
@@ -316,14 +311,15 @@ def getargs():
 if __name__ == "__main__":
     args = getargs()
 
-    utils.exit_unless_accessible(args.calls)
+    for call in args.calls:
+        utils.exit_unless_accessible(call)
     utils.setup_logging(verbosity=args.verbose)
 
     # Load graph database (remove duplicates)
-    df_all = df_from_csv_file(args.calls)
-    df = df_all.drop_duplicates()
 
     if args.algorithm == 'ancestor':
+        df_all = df_from_csv_file(args.calls[0])
+        df = df_all.drop_duplicates()
         f1, f2 = args.arg1, args.arg2
         lca = find_lca(df, f1, f2)
 
@@ -341,27 +337,38 @@ if __name__ == "__main__":
         output_to_json(lca_l, args.out)
 
     if args.algorithm == 'offspring':
-        file1, file2 = args.function1, args.function2
-        df1 = df_from_csv_file(file1)
-        df2 = df_from_csv_file(file2)
+        df1 = df_from_csv_file(args.calls[0])
+        df2 = df_from_csv_file(args.calls[1])
+        dropcols = ['call_depth', 'callee_inlined_from_file',
+                    'callee_inlined_from_line', 'indirect_found_with']
+        df1 = df1.drop(columns=dropcols)
+        df2 = df2.drop(columns=dropcols)
         df = pd.merge(
             left=df1,
             right=df2,
             how="outer",
-            on=["caller_filename", "caller_function", "callee_filename", "callee_function"],
+            on=["caller_filename", "caller_function", "callee_filename", "callee_function",
+                "caller_def_line", "caller_line", "callee_calltype", "callee_line"],
             indicator=True)
 
         # insert dummy rows with caller "___" and callee being arg1 and arg2
-        node1 = get_df_from(df1, args.source1, 'caller_function', 'caller_filename')
-        node2 = get_df_from(df2, args.source2, 'caller_function', 'caller_filename')
-        app_df = pd.DataFrame([
-            ['___', "___", "___", "0", node1.filename, node1.function,
-                "", "", "", "", "", "both"],
-            ['___', "___", "___", "0", node2.filename, node2.function,
-                "", "", "", "", "", "both"]],
-            columns=df.columns, ignore_index=True)
+        node1 = get_df_from(df1, args.function1, 'caller_function', 'caller_filename')
+        node1 = df1[(df1['caller_function'] == node1['caller_function'].iloc[0]) &
+                    (df1['caller_filename'] == node1['caller_filename'].iloc[0])]
+        node2 = get_df_from(df2, args.function2, 'caller_function', 'caller_filename')
+        node2 = df2[(df2['caller_function'] == node2['caller_function'].iloc[0]) &
+                    (df2['caller_filename'] == node2['caller_filename'].iloc[0])]
+        n1_function = node1['caller_function'].iloc[0]
+        n1_filename = node1['caller_filename'].iloc[0]
+        n1_def_line = node1['caller_def_line'].iloc[0]
+        n2_function = node2['caller_function'].iloc[0]
+        n2_filename = node2['caller_filename'].iloc[0]
+        n2_def_line = node2['caller_def_line'].iloc[0]
 
-        df.append(app_df)
+        data = [
+            ['___', "___", "", "0", n1_filename, n1_function, n1_def_line, "", "both"],
+            ['___', "___", "", "0", n2_filename, n2_function, n2_def_line, "", "both"]]
+        df = df.append(pd.DataFrame(data, columns=df.columns), ignore_index=True)
         df_to_csv_file(df, args.out)
 
     _LOGGER.info("Done")
