@@ -922,6 +922,10 @@ void CallGraphPass::resolveVirtualCallTargets(string wholeProgramBitcodeFile) {
   VirtualCallTargetsResult virtualCallTargets;
 
   unique_ptr<Module> M = parseIRFile(wholeProgramBitcodeFile, Err, LLVMCtx);
+  if (M == NULL) {
+    WARN_FMT("Error loading file: '%s'\n", wholeProgramBitcodeFile.c_str());
+    return;
+  }
   VirtualCallResolver::ResolveVirtualCalls(*M, virtualCallTargets);
   if (DEBUG) {
     LOG("Resolved virtual call targets:");
