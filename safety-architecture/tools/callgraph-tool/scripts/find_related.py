@@ -192,7 +192,7 @@ if __name__ == "__main__":
     if args.algorithm == 'ancestor':
         df_all = df_from_csv_file(args.calls[0])
         df = df_all.drop_duplicates()
-        f1, f2 = args.arg1, args.arg2
+        f1, f2 = args.function1, args.function2
         lca = find_lca(df, f1, f2)
 
         lca_l = []
