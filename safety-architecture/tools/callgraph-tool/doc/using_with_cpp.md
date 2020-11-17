@@ -131,7 +131,29 @@ The call to function `DummyWorker` initiates from line 49 where the DummyWorker 
 
 The dashed lines indicate indirect function calls. Calls from function `run` to functions `do_init` and `do_work` are shown as indirect calls in the graph, because virtual functions in C++ are implemented as function pointers. The targets of virtual function calls are correctly resolved to `do_init` and `do_work` functions defined on lines 36 and 40.
 
-Finally, the calls to `cout` on lines 20, 38, and 42 initiate calls to function `_ZStlsISt11char_traitsIcEERSt13basic_ostreamIcT_ES5_PKc`. This function corresponds to the [mangled](https://en.wikipedia.org/wiki/Name_mangling) name for function `std::basic_ostream<char, std::char_traits<char> >& std::operator<<<std::char_traits<char> >(std::basic_ostream<char, std::char_traits<char> >&, char const*)`. By default, crix-callgraph demangles function names that have demangled names in the debug information. If you would like to see demangled names for all functions, try running crix-callgraph with option `--demangle_all`. Similarly, to not demangle any function names, try option `--demangle_none`.
+Finally, the calls to `cout <<` on lines 20, 38, and 42 initiate calls to function `_ZStlsISt11char_traitsIcEERSt13basic_ostreamIcT_ES5_PKc`. This function corresponds to the [mangled](https://en.wikipedia.org/wiki/Name_mangling) name for function `std::basic_ostream<char, std::char_traits<char> >& std::operator<<<std::char_traits<char> >(std::basic_ostream<char, std::char_traits<char> >&, char const*)`. By default, crix-callgraph demangles function names that have demangled names in the debug information. If you would like to see demangled names for all functions, try running crix-callgraph with option `--demangle_all`. Similarly, to not demangle any function names, try option `--demangle_none`.
+
+The C++ standard library you built the C++ program against obviously impacts the callgraph. Clang++ uses the system default C++ standard library unless instructed otherwise. On Ubuntu, the default C++ standard library is GNU C++ standard library, libstdc++. To see how it impact the callgraph, try building the demo program against different C++ standard library implementation. As an example, we'll use the LLVM C++ standard library implementation, libc++. On Ubuntu, you can install the LLVM C++ library with `sudo apt-get install libc++-10-dev`. Use clang++'s `-stdlib` option to specify the C++ standard library to use:
+
+```
+# Compile test-cpp-demo.cpp to bitcode using libc++:
+cd $CG_DIR/tests/resources/query-callgraph; \
+clang++ -O0 -g -flto -stdlib=libc++ -fwhole-program-vtables -fvisibility=hidden \
+    -emit-llvm -c -o test-cpp-demo.bc test-cpp-demo.cpp
+
+# Re-generate the callgraph:
+$CG_DIR/build/lib/crix-callgraph --cpp_linked_bitcode test-cpp-demo.bc -o callgraph_test_cpp_demo.csv test-cpp-demo.bc
+
+# Visualize starting from main until depth 4:
+$CG_DIR/scripts/query_callgraph.py --csv callgraph_test_cpp_demo.csv --function main --depth 4 \
+--edge_labels --out test_cpp_demo_libc.png
+```
+Output:
+
+<img src=test_cpp_demo_libc.png>
+<br /><br />
+
+Notice the calls to `cout <<` on lines 20, 38, and 42 now diverge to function defined in file `/usr/lib/llvm-10/bin/../include/c++/v1/ostream`. The call chains to C++ standard library also go deeper due to the implementation differences in GNU and LLVM C++ standard libraries. Crix-callgraph includes to the callgraph database the call chains as deep as possible: typically, at the end of call chain, the call would diverge to a function from an externally linked library. In the above callgraph visualization, the nodes where the filename and line number are missing `nan:nan` are examples of such external functions. To be able to follow the call chains from those calls onwards would require building the callgraph from the specific C++ standard library implementation.
 
 ## C++ CMake example
 For an example of C++ CMake target program, we show how to generate callgraph from the crix-callgraph itself. This section assumes you have gone through the setup instructions from the main [README](../README.md) and have set the `CG_DIR` to contain the path to crix-callgraph as explained in the instructions from the main [README](../README.md).
