@@ -299,5 +299,5 @@ If we increase the `--depth` to 3, the output becomes:
 <img src=test_crixcg_filtered_d3.png>
 <br /><br />
 
-Notice the indirect calls from function Analyzer.cc:`run`: the three virtual function calls on Analyzer.cc lines 75, 94, and 110 all have the same type bool(Module*). Since the header file, Analyzer.h, includes default implementation for the virtual functions, the three functions from Analyzer.h are possible targets to all three virtual calls (doInitialization, foFinalization, and do ModulePass). In addition, possible targets include the implementations in the inherited class in file CallGraph.cc.
+Notice the indirect calls from function Analyzer.cc:`run`: the three virtual function calls on Analyzer.cc lines 75, 94, and 110 all have the same type: `bool(Module*)`. Since the header file, Analyzer.h, includes default implementation for the virtual functions, the three functions from Analyzer.h are possible targets to all three virtual calls (doInitialization, doFinalization, and doModulePass). In addition, possible targets include the implementations in the inherited class in file CallGraph.cc.
 
