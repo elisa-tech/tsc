@@ -11,6 +11,8 @@ Table of Contents
    * [Compiling target program to bitcode](#compiling-target-program-to-bitcode)
    * [Generating callgraph database with crix-callgraph](#generating-callgraph-database-with-crix-callgraph)
    * [Visualizing callgraph database](#visualizing-callgraph-database)
+      * [Handling name mangling](#handling-name-mangling)
+      * [Impact of C++ standard library](#impact-of-c-standard-library)
 * [C++ CMake example](#c-cmake-example)
    * [Compiling target program to bitcode](#compiling-target-program-to-bitcode-1)
    * [Generating callgraph database with crix-callgraph](#generating-callgraph-database-with-crix-callgraph-1)
@@ -101,7 +103,10 @@ cd $CG_DIR && make
 
 # Generate callgraph based on the test-cpp-demo.bc
 cd $CG_DIR/tests/resources/query-callgraph; \
-$CG_DIR/build/lib/crix-callgraph --cpp_linked_bitcode test-cpp-demo.bc -o callgraph_test_cpp_demo.csv test-cpp-demo.bc
+$CG_DIR/build/lib/crix-callgraph \
+    --cpp_linked_bitcode test-cpp-demo.bc \
+    -o callgraph_test_cpp_demo.csv \
+    test-cpp-demo.bc
 
 # Now, you can find the callgraph database in `callgraph_test_cpp_demo.csv`
 ```
@@ -117,8 +122,12 @@ To visualize the functions called by function `main` run the following command:
 # --out test_cpp_demo.png: output png-image with filename 'test_cpp_demo.png'
 
 cd $CG_DIR/tests/resources/query-callgraph; \
-$CG_DIR/scripts/query_callgraph.py --csv callgraph_test_cpp_demo.csv --function main --depth 3 \
---edge_labels --out test_cpp_demo.png
+$CG_DIR/scripts/query_callgraph.py \
+    --csv callgraph_test_cpp_demo.csv \
+    --function main \
+    --depth 3 \
+    --edge_labels \
+    --out test_cpp_demo.png
 ```
 Output:
 
@@ -131,9 +140,37 @@ The call to function `DummyWorker` initiates from line 49 where the DummyWorker 
 
 The dashed lines indicate indirect function calls. Calls from function `run` to functions `do_init` and `do_work` are shown as indirect calls in the graph, because virtual functions in C++ are implemented as function pointers. The targets of virtual function calls are correctly resolved to `do_init` and `do_work` functions defined on lines 36 and 40.
 
-Finally, the calls to `cout <<` on lines 20, 38, and 42 initiate calls to function `_ZStlsISt11char_traitsIcEERSt13basic_ostreamIcT_ES5_PKc`. This function corresponds to the [mangled](https://en.wikipedia.org/wiki/Name_mangling) name for function `std::basic_ostream<char, std::char_traits<char> >& std::operator<<<std::char_traits<char> >(std::basic_ostream<char, std::char_traits<char> >&, char const*)`. By default, crix-callgraph demangles function names that have demangled names in the debug information. If you would like to see demangled names for all functions, try running crix-callgraph with option `--demangle_all`. Similarly, to not demangle any function names, try option `--demangle_none`.
+#### Handling name mangling
+The calls to `cout <<` on lines 20, 38, and 42 initiate calls to function `_ZStlsISt11char_traitsIcEERSt13basic_ostreamIcT_ES5_PKc`. This function corresponds to the [mangled](https://en.wikipedia.org/wiki/Name_mangling) name for function `std::basic_ostream<char, std::char_traits<char> >& std::operator<<<std::char_traits<char> >(std::basic_ostream<char, std::char_traits<char> >&, char const*)`. By default, crix-callgraph demangles function names that contain demangled names in the IR metadata. If you would like to see demangled names for all functions, try running crix-callgraph with option `--demangle_all`. Similarly, to not demangle any function names, try option `--demangle_none`.
 
-The C++ standard library you built the C++ program against obviously impacts the callgraph. Clang++ uses the system default C++ standard library unless instructed otherwise. On Ubuntu, the default C++ standard library is GNU C++ standard library, libstdc++. To see how it impact the callgraph, try building the demo program against different C++ standard library implementation. As an example, we'll use the LLVM C++ standard library implementation, libc++. On Ubuntu, you can install the LLVM C++ library with `sudo apt-get install libc++-10-dev`. Use clang++'s `-stdlib` option to specify the C++ standard library to use:
+As an example, to generate the same callgraph as above, but with `--demangle_all` you would run:
+```
+# Generate callgraph based on the test-cpp-demo.bc, demangling all function names
+cd $CG_DIR/tests/resources/query-callgraph; \
+$CG_DIR/build/lib/crix-callgraph \
+    --demangle_all \
+    --cpp_linked_bitcode test-cpp-demo.bc \
+    -o callgraph_test_cpp_demo.csv \
+    test-cpp-demo.bc
+
+# Visualize the callgraph from function main
+cd $CG_DIR/tests/resources/query-callgraph; \
+$CG_DIR/scripts/query_callgraph.py \
+    --csv callgraph_test_cpp_demo.csv \
+    --function main \
+    --depth 3 \
+    --edge_labels \
+    --out test_cpp_demo_alldemangled.png
+```
+Output:
+
+<img src=test_cpp_demo_alldemangled.png>
+<br /><br />
+
+Notice that with `--demangle_all`, the function names also include the scope resolution (::). This might be preferrable if, for instance, there are functions with different scopes in one file, as is the case in this simple example.
+
+#### Impact of C++ standard library
+The C++ standard library you built the C++ program against impacts the callgraph. Clang++ uses the system default C++ standard library unless instructed otherwise. On Ubuntu, the default C++ standard library is GNU C++ standard library, libstdc++. To see how it impacts the callgraph, try building the demo program against different C++ standard library implementation. As an example, we'll use the LLVM C++ standard library implementation, libc++. On Ubuntu, you can install the LLVM C++ library with `sudo apt-get install libc++-10-dev`. Use clang++'s `-stdlib` option to specify the C++ standard library to use:
 
 ```
 # Compile test-cpp-demo.cpp to bitcode using libc++:
@@ -153,7 +190,7 @@ Output:
 <img src=test_cpp_demo_libc.png>
 <br /><br />
 
-Notice the calls to `cout <<` on lines 20, 38, and 42 now diverge to function defined in file `/usr/lib/llvm-10/bin/../include/c++/v1/ostream`. The call chains to C++ standard library also go deeper due to the implementation differences in GNU and LLVM C++ standard libraries. Crix-callgraph includes to the callgraph database the call chains as deep as possible: typically, at the end of call chain, the call would diverge to a function from an externally linked library. In the above callgraph visualization, the nodes where the filename and line number are missing `nan:nan` are examples of such external functions. To be able to follow the call chains from those calls onwards would require building the callgraph from the specific C++ standard library implementation.
+Notice the calls to `cout <<` on lines 20, 38, and 42 now diverge to function defined in file `/usr/lib/llvm-10/bin/../include/c++/v1/ostream`. The call chains to C++ standard library also go deeper due to the implementation differences in GNU and LLVM C++ standard libraries. Crix-callgraph includes to the callgraph database the call chains as deep as possible: typically, at the end of call chain, the call would diverge to a function from an externally linked library. In the above callgraph visualization, the nodes where the filename and line number are missing (`nan:nan`) are examples of such external functions. To be able to follow the call chains from those calls onwards would require building the callgraph from the specific C++ standard library implementation.
 
 ## C++ CMake example
 For an example of C++ CMake target program, we show how to generate callgraph from the crix-callgraph itself. This section assumes you have gone through the setup instructions from the main [README](../README.md) and have set the `CG_DIR` to contain the path to crix-callgraph as explained in the instructions from the main [README](../README.md).

@@ -177,13 +177,7 @@ int main(int argc, char **argv) {
   CallGraphPass CGPass(&GlobalCtx);
   CGPass.run(GlobalCtx.Modules);
   if (!optCppLinkedBitcode.empty()) {
-#if __clang_major__ <= 10
     CGPass.resolveVirtualCallTargets(optCppLinkedBitcode);
-#else
-    WARN_FMT("Resolving virtual call targets is currently not supported on "
-             "llvm-11 or later%s",
-             "\n");
-#endif
   }
   OP << "[Wrote: " << optOutFilename << "]\n";
 

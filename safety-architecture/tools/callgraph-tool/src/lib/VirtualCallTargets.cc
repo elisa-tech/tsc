@@ -31,8 +31,6 @@ using namespace virtcall;
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-#if __clang_major__ <= 10
-
 namespace llvm {
 void initializeVirtualCallTargetsPass(PassRegistry &);
 void initializeDominatorTreeWrapperPassPass(PassRegistry &);
@@ -103,7 +101,11 @@ private:
   // the indirect virtual call.
   struct VirtualCallSite {
     llvm::Value *VTable;
-    llvm::CallSite CS;
+#if __clang_major__ <= 10
+    llvm::CallSite Call;
+#else
+    llvm::CallBase &Call;
+#endif
   };
 
   class VTableSlotEqual {
@@ -156,7 +158,6 @@ void VirtualCallTargets::scanTypeTestUsers(Function *TypeTestFunc) {
   // points to a member of the type identifier %md. Group calls by (type ID,
   // offset) pair (effectively the identity of the virtual function) and store
   // to CallSlots.
-  DenseSet<CallSite> SeenCallSites;
   for (auto I = TypeTestFunc->use_begin(), E = TypeTestFunc->use_end();
        I != E;) {
     auto CI = dyn_cast<CallInst>(I->getUser());
@@ -182,7 +183,11 @@ void VirtualCallTargets::scanTypeTestUsers(Function *TypeTestFunc) {
     }
     for (const auto &Call : DevirtCalls) {
       CallSlots[{TypeId, Call.Offset}].push_back(
+#if __clang_major__ <= 10
           {CI->getArgOperand(0), Call.CS});
+#else
+          {CI->getArgOperand(0), Call.CB});
+#endif
     }
   }
 }
@@ -261,12 +266,17 @@ void VirtualCallTargets::updateResults(
     for (const auto &slot : TargetsForSlot) {
       candidates.insert(slot.Fn);
     }
-    if (cs.CS.isCall()) {
-      m_results.addVirtualCallCandidates(
-          dyn_cast<CallInst>(cs.CS.getInstruction()), move(candidates));
-    } else if (cs.CS.isInvoke()) {
-      m_results.addVirtualInvokeCandidates(
-          dyn_cast<InvokeInst>(cs.CS.getInstruction()), move(candidates));
+
+#if __clang_major__ <= 10
+    Instruction *I = cs.Call.getInstruction();
+#else
+    Instruction *I = &cs.Call;
+#endif
+
+    if (auto *CI = dyn_cast<CallInst>(I)) {
+      m_results.addVirtualCallCandidates(CI, move(candidates));
+    } else if (auto *II = dyn_cast<InvokeInst>(I)) {
+      m_results.addVirtualInvokeCandidates(II, move(candidates));
     }
   }
 }
@@ -366,5 +376,3 @@ void VirtualCallResolver::ResolveVirtualCalls(
 AnalysisKey VirtualCallTargets::Key;
 
 ////////////////////////////////////////////////////////////////////////////////
-
-#endif //  __clang_major__ <= 10

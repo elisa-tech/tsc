@@ -155,12 +155,6 @@ class Grapher():
                     filename, require_cols))
             exit(1)
 
-        # Graphviz apparently doesn't like colons in node names
-        self.df['caller_function'] = self.df.caller_function.str.replace(
-            ':', ' ')
-        self.df['callee_function'] = self.df.callee_function.str.replace(
-            ':', ' ')
-
     def _load_coverage_data(self, filename):
         utils.exit_unless_accessible(filename)
         self.df_cov = pd.read_csv(filename, sep=None, engine='python')
@@ -465,11 +459,15 @@ def regex_match(regex, s):
 
 
 def node_id(filename, function, line):
-    return "%s_%s_%s" % (
+    # Graphviz doesn't like colons in the node names: we simply
+    # remove them here. node_id is only used to uniquely identify each
+    # node in the graph: each node has a label associated to it and
+    # the labels can still contain colons.
+    return ("%s_%s_%s" % (
         filename,
         html.escape(str(function)),
         float(line)
-    )
+    )).replace(":", "")
 
 
 def getargs():

@@ -28,16 +28,39 @@ EXPECTED = TEST_RESOURCES_DIR / "expected_calls.csv"
 
 ################################################################################
 
+def get_clang_bin_path():
+    cmake_output = TESTS_DIR / "../build/CMakeFiles/CMakeOutput.log"
+    with open(cmake_output) as f:
+        for line in f:
+            match = re.match(r"^Compiler:\s*(.+)", line)
+            if match:
+                return Path(os.path.dirname(os.path.realpath(match.group(1))))
+    return None
+
+
+def get_clang_version():
+    cmake_output = TESTS_DIR / "../build/CMakeFiles/CMakeOutput.log"
+    with open(cmake_output) as f:
+        for line in f:
+            match = re.search(r"clang\s*version\s*([\d.]+)\b", line)
+            if match:
+                return match.group(1)
+    return None
+
 
 @pytest.fixture(scope="session", autouse=True)
 def set_up_session_test_data(request):
     # Run once at the start of test session, before any tests have been run
     print("session setup")
+    clang_path = get_clang_bin_path()
+    assert(Path(clang_path).exists())
+    clang_version = get_clang_version()
+    assert(clang_version)
     request.addfinalizer(clean_up_session_test_data)
     assert Path(CG_BIN).exists()
     # Generate target bitcode files
     assert Path(BC_GENERATE).exists()
-    cmd = [BC_GENERATE]
+    cmd = [BC_GENERATE, clang_path, clang_version]
     assert subprocess.run(cmd).returncode == 0
     os.chdir(TEST_RESOURCES_DIR)
 
@@ -47,16 +70,6 @@ def clean_up_session_test_data():
     os.chdir(TEST_RESOURCES_DIR)
     cmd = ["make", "clean"]
     assert subprocess.run(cmd).returncode == 0
-
-
-def get_clang_version():
-    cmake_output = TESTS_DIR / "../build/CMakeFiles/CMakeOutput.log"
-    with open(cmake_output) as f:
-        for line in f:
-            match = re.search(r"clang\s*version\s*(\d+)\.", line)
-            if match:
-                return match.group(1)
-    return None
 
 
 @pytest.fixture()
@@ -81,10 +94,7 @@ def check_function_calls_from(target_bc_file_name, cpp=False):
     if target_bc_file_name.endswith(".bclist"):
         target_bc_file = "@%s" % target_bc_file
 
-    if cpp and (int(get_clang_version()) >= 11):
-        print("Not supported on llvm-11 currently")
-        return
-    elif cpp:
+    if cpp:
         cmd = [CG_BIN,
                "-cpp_linked_bitcode", target_bc_file,
                "-o", outfile,

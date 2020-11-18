@@ -11,6 +11,7 @@ SHELL := /bin/bash
 CLANG_BIN_DIR := /usr/lib/llvm-10/bin
 CG_BIN := ../../../build/lib/crix-callgraph
 PATH := $(CLANG_BIN_DIR):$(PATH)
+LLVM_VERSION := 10.0.0
 
 # List of target c programs
 PROGS = \
@@ -63,8 +64,7 @@ clang-check:
 	@which llvm-link >/dev/null
 
 cg-bin:
-	# cd ../../../ && make LLVM_DIR=/home/hrosten/projects/llvm-project-10.0.0/prefix LLVM_VERSION=10.0.0 crix-callgraph
-	cd ../../../ && make crix-callgraph
+	cd ../../../ && make LLVM_DIR=$(CLANG_BIN_DIR)/../ LLVM_VERSION=$(LLVM_VERSION) crix-callgraph
 
 # Build bitcode files from the targets in PROGS
 # Run CG_BIN to generate the callgraph for each bitcode target
