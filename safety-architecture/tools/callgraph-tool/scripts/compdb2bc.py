@@ -11,6 +11,7 @@ import argparse
 import logging
 import multiprocessing
 import utils
+import subprocess
 
 ###############################################################################
 
@@ -48,6 +49,9 @@ def set_clang_bindings_and_lib(bindings, libclang):
 
 ################################################################################
 
+def filter_list(lst, blacklist):
+    return [x for x in lst if x not in blacklist]
+
 
 class BitcodeCompiler():
     def __init__(
@@ -58,6 +62,7 @@ class BitcodeCompiler():
         self.srcfile = srcfile
         self.clang_bin = clang
         self.keepcwd = keepcwd
+        self.blacklist_args = multiprocessing.Manager().list()
         _LOGGER.debug("Using python bindings: %s" % str(cl))
 
     def generate_bitcode(self):
@@ -68,6 +73,72 @@ class BitcodeCompiler():
         self._compile()
         # Change working directory back to where it was
         os.chdir(cwd)
+
+    def run_compile_cmd(self, cmd):
+        cmd = filter_list(cmd, self.blacklist_args)
+        command_str = " ".join(cmd)
+        _LOGGER.debug("Running: %s" % command_str)
+        ret = subprocess.run(cmd, capture_output=True)
+
+        # Compilation was successful
+        if ret.returncode == 0:
+            return
+
+        # There was an error in the compilation
+        _LOGGER.debug("Command returned error status: %s" % ret.returncode)
+        errstr = ret.stderr.decode("utf-8")
+        _LOGGER.debug("stderr: %s" % errstr)
+
+        # Look for the following errors in the stderr output and try to
+        # recover. For arguments not supported by clang, we simply remove
+        # them from the compile command by adding them to the 
+        # self.blacklist_args. For unrecoverable errors, we show an error
+        # message, but continue compiling the remaining files.
+
+        RE_UNKNOWN_ARG = re.compile(r'.*error: unknown argument: \'(?P<arg>[^\']+)\'')
+        RE_UNSUPPORTED_OPT = re.compile(
+            r'.*error: unsupported option \'(?P<arg>[^\']+)\' for target')
+        RE_ERROR = re.compile(r'.*error:(?P<error>.*)')
+        RE_UNKNOWN_WARN = re.compile(
+            r'.*warning: unknown warning option \'(?P<opt>[^\']+)\'')
+
+        match = None
+        reparse = False
+
+        if not match:
+            match = RE_UNKNOWN_ARG.match(errstr)
+            if match:
+                unknown_arg = match.group('arg')
+                _LOGGER.info("Adding unknown arg: %s" % unknown_arg)
+                self.blacklist_args.append(unknown_arg)
+                reparse = True
+
+        if not match:
+            match = RE_UNSUPPORTED_OPT.match(errstr)
+            if match:
+                unsupported_arg = match.group('arg')
+                _LOGGER.info("Adding unsupported arg: %s" % unsupported_arg)
+                self.blacklist_args.append(unsupported_arg)
+                reparse = True
+
+        if not match:
+            match = RE_UNKNOWN_WARN.match(errstr)
+            if match:
+                unsupported_arg = match.group('opt')
+                _LOGGER.info("Adding unknown warning option: %s" % unsupported_arg)
+                self.blacklist_args.append(unsupported_arg)
+                reparse = True
+        
+        # Other errors are unrecoverable
+        if not match:
+            match = RE_ERROR.match(errstr)
+            if match:
+                _LOGGER.error("Error: \"%s\"" % errstr)
+                reparse = False
+
+        if (reparse):
+            self.run_compile_cmd(cmd)
+
 
     def _compile(self):
         compdb = cl.CompilationDatabase.fromDirectory(self.compdbpath)
@@ -96,13 +167,19 @@ class BitcodeCompiler():
                 arglist.insert(1, "-c")
                 arglist.insert(2, "-emit-llvm")
                 # Add ".bc" postfix to the original output filename
+                found_o = False
                 for i, value in enumerate(arglist):
                     if value == "-o" and len(arglist) > i:
+                        found_o = True
                         if not arglist[i + 1].endswith(".bc"):
                             arglist[i + 1] = "%s.bc" % arglist[i + 1]
+                # In the absence of -o, set the output bitcode file name to
+                # original source file name appended with .bc suffix:
+                if not found_o:
+                    arglist = arglist + ["-o", "%s.bc" % cc.filename]
                 # Additional arguments from command line
                 arglist = arglist + self.append_args
-                result = pool.apply_async(utils.exec_cmd, [arglist])
+                result = pool.apply_async(self.run_compile_cmd, [arglist])
                 results.append(result)
 
             # Wait for all the processes to exit
