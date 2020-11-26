@@ -91,11 +91,12 @@ class BitcodeCompiler():
 
         # Look for the following errors in the stderr output and try to
         # recover. For arguments not supported by clang, we simply remove
-        # them from the compile command by adding them to the 
+        # them from the compile command by adding them to the
         # self.blacklist_args. For unrecoverable errors, we show an error
         # message, but continue compiling the remaining files.
 
-        RE_UNKNOWN_ARG = re.compile(r'.*error: unknown argument: \'(?P<arg>[^\']+)\'')
+        RE_UNKNOWN_ARG = re.compile(
+            r'.*error: unknown argument: \'(?P<arg>[^\']+)\'')
         RE_UNSUPPORTED_OPT = re.compile(
             r'.*error: unsupported option \'(?P<arg>[^\']+)\' for target')
         RE_ERROR = re.compile(r'.*error:(?P<error>.*)')
@@ -125,10 +126,11 @@ class BitcodeCompiler():
             match = RE_UNKNOWN_WARN.match(errstr)
             if match:
                 unsupported_arg = match.group('opt')
-                _LOGGER.info("Adding unknown warning option: %s" % unsupported_arg)
+                _LOGGER.info("Adding unknown warning option: %s" %
+                             unsupported_arg)
                 self.blacklist_args.append(unsupported_arg)
                 reparse = True
-        
+
         # Other errors are unrecoverable
         if not match:
             match = RE_ERROR.match(errstr)
@@ -138,7 +140,6 @@ class BitcodeCompiler():
 
         if (reparse):
             self.run_compile_cmd(cmd)
-
 
     def _compile(self):
         compdb = cl.CompilationDatabase.fromDirectory(self.compdbpath)
