@@ -29,9 +29,9 @@ To compile crix-callgraph using the custom version of LLVM, run:
 cd $CG_DIR
 
 # Make sure correct version of clang is in $PATH. 
-# Notice the argument './clang' which indicates the directory that
+# Notice the argument '--clangdir ./clang' which indicates the directory that
 # contains the clang binaries somewhere in the directory hierarchy
-source env.sh ./clang
+source env.sh --clangdir ./clang
 
 # Clean
 make clean
@@ -44,4 +44,4 @@ make LLVM_DIR=./clang/bin/ LLVM_VERSION=11.0.0
 # Now, you can find the executable in `build/lib/crix-callgraph`
 ```
 ## Building kernel with custom LLVM
-Make sure the correct version of clang is in the PATH before any other version of clang by setting the environment with `cd $CG_DIR && source env.sh ./clang` before building the kernel. Then, follow the instructions e.g. from the main [README](../README.md#generate-bitcode-files-from-the-target-program) to build the kernel and generate bitcode files.
+Make sure the correct version of clang is in the PATH before any other version of clang by setting the environment with `cd $CG_DIR && source env.sh -c ./clang` before building the kernel. Then, follow the instructions e.g. from the main [README](../README.md#generate-bitcode-files-from-the-target-program) to build the kernel and generate bitcode files.
