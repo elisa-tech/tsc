@@ -82,7 +82,7 @@ This query results in a following image for a given database:
 ## Larger example
 The examples given so far are intentionally contrived to illustrate the capabilities of the script. These results could have easily been read out from the image of the whole program graph. The usefulness of the script can be demonstrated on a more complicated codebase, such as that of a Linux kernel. Say we want to find out the receive system calls that use `sock_recvmsg` function. We can answer this question by issuing the following query:
 ```
-./find_callshains --calls calls.csv --from_function sock_recvmsg --to_function ^__x64_sys_recv --direction=left --cutoff=12 --out=from_sock_recvmsg_to_x64_sys_recv_left.jpg
+./find_callchains --calls calls.csv --from_function sock_recvmsg --to_function ^__x64_sys_recv --direction=left --cutoff=12 --out=from_sock_recvmsg_to_x64_sys_recv_left.jpg
 
 ```
 Note that the database of kernel source is huge and analyzing the paths may take some time. In order to improve the performance, the optional `--cutoff` parameter can be used to limit the length of the paths that we are interested in.
