@@ -26,6 +26,12 @@ Proposed mission statement
 of the ELISA mission statement, or a specific industry sector or type of safety
 use case for Linux?*
 
+Rationale
+---------
+
+*Why is the new working group needed? What is it intended to accomplish that is
+not already addressed by one of the existing working groups?*
+
 Planned activities
 ------------------
 
