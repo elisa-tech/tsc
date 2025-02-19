@@ -1,4 +1,5 @@
 # SPDX-FileCopyrightText: 2019 Bayerische Motoren Werke Aktiengesellschaft (BMW AG)
+# SPDX-FileCopyrightText: 2022 Henri Rosten
 #
 # SPDX-License-Identifier: GPL-2.0-only
 
@@ -25,6 +26,7 @@ matrix:
       before_install:
         - cd development-process/stable-maintenance/regression-analysis/
       install:
+        - pip install --upgrade importlib_metadata
         - make install-requirements
       script:
         - make pre-push

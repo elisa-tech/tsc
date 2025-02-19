@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 # SPDX-FileCopyrightText: 2020 Bayerische Motoren Werke Aktiengesellschaft (BMW AG)
+# SPDX-FileCopyrightText: 2022 Henri Rosten
 #
 # SPDX-License-Identifier: Apache-2.0
 
@@ -53,9 +54,9 @@ def set_up_session_test_data(request):
     # Run once at the start of test session, before any tests have been run
     print("session setup")
     clang_path = get_clang_bin_path()
-    assert(Path(clang_path).exists())
+    assert Path(clang_path).exists()
     clang_version = get_clang_version()
-    assert(clang_version)
+    assert clang_version
     request.addfinalizer(clean_up_session_test_data)
     assert Path(CG_BIN).exists()
     # Generate target bitcode files

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2019 Bayerische Motoren Werke Aktiengesellschaft (BMW AG)
+# SPDX-FileCopyrightText: 2022 Henri Rosten
 #
 # SPDX-License-Identifier: GPL-2.0-only
 
@@ -741,7 +742,7 @@ if __name__ == "__main__":
     nomerges = args.no_merge_datapoints
 
     repo = repo if repo.endswith(".git") else os.path.join(repo, ".git")
-    if(not (os.path.isdir(repo))):
+    if (not (os.path.isdir(repo))):
         sys.stderr.write("Error: not a git repository: %s\n" % repo)
         sys.exit(1)
 
