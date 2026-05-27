@@ -14,7 +14,7 @@ The following are a few tips to improve the general security posture when starti
 ### Repository settings
 
 - Enable **"Require approval for all outside collaborators"** under Actions > General > Fork pull request workflows. This prevents automated workflow execution from unknown contributors.
-- Add a `CODEOWNERS` file to require maintainer review on security-sensitive paths, especially `.github/workflows/*`.
+- Add a `CODEOWNERS` file to require maintainer review on security-sensitive paths, especially `.github/workflows/*`. [What is a CODEOWNER file?](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners)
 
 ### Workflow hardening
 
@@ -32,7 +32,7 @@ The following are a few tips to improve the general security posture when starti
 
 ### Monitoring
 
-- Enable repository audit logging.
+- Enable [repository audit logging.](https://docs.github.com/en/organizations/keeping-your-organization-secure/managing-security-settings-for-your-organization/reviewing-the-audit-log-for-your-organization)
 - Watch for unexpected workflow triggers, especially from new or bot accounts.
 
 ### References
@@ -40,7 +40,6 @@ The following are a few tips to improve the general security posture when starti
 - [GitHub — Security hardening for GitHub Actions](https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions)
 - [OpenSSF — GitHub Actions Security Best Practices](https://best.openssf.org/developers/github-actions)
 - [OpenSSF — OSPS Baseline](https://best.openssf.org/)
-- [ELISA AeroWG — GitHub Actions Security Best Practices](https://github.com/elisa-tech/wg-aerospace/blob/main/docs/github-actions-security-best-practices.md) (detailed reference with OSPS alignment mapping)
 
 ## Linting
 
@@ -48,7 +47,7 @@ The super linter project is one option to help with consistency and security of 
 The GitHub action linter specifically can help with setting **least privilege** and prevent unintended workflow privilege inheritance by a forked repository.
 This is an example lint configuration that [runs as a workflow](https://github.com/elisa-tech/wg-aerospace/blob/main/.github/workflows/lint.yml).
 
-The following can be setup locally to lint material before pushing to the repository (this assumes you have setup [a configuration env file](https://github.com/elisa-tech/wg-aerospace/blob/main/.github/super-linter.env)):
+The following can be setup locally to lint material before pushing to the repository (this assumes you have setup [a configuration env file](https://github.com/elisa-tech/tsc/blob/main/.github/super-linter.env)):
 
 ```bash
 # Run once after checkout to setup the hook
@@ -108,6 +107,8 @@ Note: Please refer to the [ELISA Technical Charter section 7](https://elisa.tech
 
 ### DCO sign-off in practice
 
+The repository should have [DCO enabled.](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/managing-the-commit-signoff-policy-for-your-repository)
+
 Contributors must add a `Signed-off-by` line to every commit using the `--signoff` flag:
 
 ```bash
@@ -131,4 +132,3 @@ git commit --amend --signoff --no-edit
 git push origin --force-with-lease
 ```
 
-See the [ELISA Automotive WG contribution workflow](https://github.com/elisa-tech/wg-automotive#signing-off-and-dco) for an additional example.
