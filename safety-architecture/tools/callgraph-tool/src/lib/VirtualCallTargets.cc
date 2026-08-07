@@ -145,7 +145,7 @@ private:
                 const std::vector<llvm::wholeprogramdevirt::VirtualCallTarget>
                     TargetsForSlot);
 
-  llvm::function_ref<llvm::DominatorTree &(llvm::Function &)> LookupDomTree;
+  std::function<llvm::DominatorTree &(llvm::Function &)> LookupDomTree;
   VTableSlotCallSitesMap CallSlots;
   VirtualCallTargetsResult m_results;
 };
