@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 # SPDX-FileCopyrightText: 2020 Bayerische Motoren Werke Aktiengesellschaft (BMW AG)
+# SPDX-FileCopyrightText: 2022 Henri Rosten
 #
 # SPDX-License-Identifier: Apache-2.0
 import argparse
@@ -36,8 +37,8 @@ class CallGraphFilter():
         self.callee_line = callee_line
 
     def get_query_str(self):
-        return ' & '.join(
-            ["{}=='{}'".format(key, value)
+        return ' and '.join(
+            ["{} == '{}'".format(key, value)
              for key, value in self.__dict__.items() if value is not None])
 
     def __eq__(self, other):
@@ -137,7 +138,7 @@ class Grapher():
 
     def _load_callgraph_data(self, filename):
         utils.exit_unless_accessible(filename)
-        self.df = pd.read_csv(filename, na_values=[''], keep_default_na=False)
+        self.df = pd.read_csv(filename, dtype=str, keep_default_na=False)
         self.df.reset_index(drop=True, inplace=True)
         self.df.columns = self.df.columns.str.lower()
         require_cols = [
@@ -466,7 +467,7 @@ def node_id(filename, function, line):
     return ("%s_%s_%s" % (
         filename,
         html.escape(str(function)),
-        float(line)
+        str(line)
     )).replace(":", "")
 
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 # SPDX-FileCopyrightText: 2020 Bayerische Motoren Werke Aktiengesellschaft (BMW AG)
+# SPDX-FileCopyrightText: 2022 Henri Rosten
 #
 # SPDX-License-Identifier: Apache-2.0
 
@@ -28,6 +29,7 @@ def df_to_string(df):
 
 
 def df_difference(df_left, df_right):
+    df_right = df_right.astype(df_left.dtypes.to_dict())
     df = df_left.merge(
         df_right,
         how='outer',
