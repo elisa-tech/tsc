@@ -1,0 +1,69 @@
+# ELISA Policies and Guidelines
+
+This document outlines the policies and guidelines for developing and publishing ELISA deliverables.
+
+**ELISA deliverables:**
+- ELISA develops an example qualitative analysis for safety critical use-cases for the Linux kernel e.g: Automotive and Medical.
+- ELISA provides resources for System integrators to apply and use to analyze qualitatively and quantitatively on their systems. For example, ELISA will analyze published CWEs to identify hazards for the two use-cases.
+- System Integrators use ELISA deliverables to analyze their systems
+
+**What are the publications:**
+- Whitepapers and blogs published on elisatech etc.
+- Link to the github repository
+
+Presentations and work in progress are not considered a publication until reviewed and added to one of the publication sites. All work in progress on github should contain licenses.
+
+### Publication Licensing Policy
+All ELISA documentation deliverables shall be released under CC-BY-4.0. All published documents shall carry the following licensing information.
+
+### Licensing Header
+
+**SPDX-License-Identifier: CC-BY-4.0**
+This document is released under the Creative Commons Attribution 4.0 International License, available at https://creativecommons.org/licenses/by/4.0/legalcode. Pursuant to Section 5 of the license, please note that the following disclaimers apply (capitalized terms have the meanings set forth in the license).
+
+To the extent possible, the Licensor offers the Licensed Material as-is and as-available, and makes no representations or warranties of any kind concerning the Licensed Material, whether express, implied, statutory, or other. This includes, without limitation, warranties of title, merchantability, fitness for a particular purpose, non-infringement, absence of latent or other defects, accuracy, or the presence or absence of errors, whether or not known or discoverable.  Where disclaimers of warranties are not allowed in full or in part, this disclaimer may not apply to You.
+
+To the extent possible, in no event will the Licensor be liable to You on any legal theory (including, without limitation, negligence) or otherwise for any direct, special, indirect, incidental, consequential, punitive, exemplary, or other losses, costs, expenses, or damages arising out of this Public License or use of the Licensed Material, even if the Licensor has been advised of the possibility of such losses, costs, expenses, or damages. Where a limitation of liability is not allowed in full or in part, this limitation may not apply to You.
+
+The disclaimer of warranties and limitation of liability provided above shall be interpreted in a manner that, to the extent possible, most closely approximates an absolute disclaimer and waiver of all liability
+
+References to documents that use this header:
+- https://elisa.tech/wp-content/uploads/sites/75/2021/05/ELISA_Advancing-Open-Source-Safety-Critical-Systems_Whitepaper_050521.pdf
+- https://github.com/elisa-tech/wg-medical-devices/commit/79290c454ab8f4f03560090843f84d13ed7b3360
+
+### Policy for tools and resources used for qualitative analysis
+
+All ELISA work products must be contributed and made available under GPL-2.0 and submitted with Developer Certificate of Origin (DCO) sign-off statements. This applies regardless of whether the work product is for tools or for user space code.
+
+If contributions are added to an existing tool, they are considered to be under the license associated with the existing project. 
+
+ELISA uses tools and references to develop example qualitative analysis for Automotive and Medical use-cases for the Linux kernel and provides resources for System integrators to use to analyze their systems.
+
+**Tools and references used in the qualitative analysis:**
+
+- Tools should satisfy the following criteria:
+	- Available now under GPL-2.0 or equivalent license
+	- Sources are publicly available and easily downloadable
+	- Actively maintained: Developers and maintainers are actively engaged in reviewing patches and pull requests for fixes and new features.
+	- When a tool is no longer maintained, it will be moved to an “attic” until a maintainer is identified.
+- WG leads are responsible for ensuring that any tool they use has been evaluated to confirm that it meets the above criteria.
+- Exceptions may be granted after reviewing the tool in the TSC if there are no other tools available and the development happens in open.
+- Evaluated tools must be documented in a publically available registry maintained by ELISA (e.g. a GitHub repo), which identifies the version(s) of the tool evaluated and records the results of the evaluation (e.g. was it selected, why it was rejected, analysis of tool against criteria from a safety standard, etc). 
+
+### Review Policies
+ELISA shall make tools and resources published via ELISA GitHub repositories.
+
+- Repositories must have a clearly identified main branch, which contains peer-reviewed and approved versions of the tools or resources
+- Changes to the main must be proposed in ‘working’ branches and reviewed by ELISA contributors via the GitHub Pull request (PR) process; direct changes to main will be disabled
+- Each repository will have one or more maintainers with the authority to approve Pull Requests (PRs) for inclusion in the main branch
+- Each repository must have a documented review policy and acceptance criteria for PRs, to provide guidance to contributors, maintainers and reviewers.
+- All new inbound code contributions must also be accompanied by a Developer Certificate of Origin (http://developercertificate.org) sign-off in the source code system that is submitted through a TSC-approved contribution process which will bind the authorized contributor and, if not self-employed, their employer to the applicable license.
+
+### Investigation on safety standards use in reference process
+
+Need to describe a quality model of documents we create…  and the level of quality.
+- Identify how document was created (ie. as an investigation, and does not claim completeness,  soundness and agreed among larger group)
+
+ELISA contributors are not all expected to have access to safety standards. Therefore, the requirements documented in the ELISA Reference Process will be used instead of requirements from specific safety standards.
+
+The ELISA reference process is used as a framework for  developing an example qualitative analysis for Automotive and Medical use-cases for the Linux kernel.
